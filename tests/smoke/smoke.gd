@@ -105,6 +105,13 @@ func _physics_process(_delta: float) -> void:
 			_expect(shots == 1, "one trigger pull fired %d shotgun shells" % shots)
 			_expect(hits >= 2, "only %d of 8 pellets hit a dummy 5 m away" % hits)
 			print("smoke: shotgun landed %d of 8 pellets" % hits)
+		572:
+			_player.call("enable_touch")
+		578:
+			_expect(_player.get("touch") != null, "enable_touch did not create touch controls")
+			_expect(_player.call("input_active"), "touch controls should be active when not paused")
+			_player.call("set_paused", true)
+			_expect(not _player.call("input_active"), "paused touch controls still accept input")
 		580:
 			_finish()
 

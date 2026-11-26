@@ -60,10 +60,10 @@ func _ready() -> void:
 	_zone_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_zone_row)
 	_feed = VBoxContainer.new()
-	_feed.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_feed.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	# 왼쪽 위에 둔다. 오른쪽은 터치 버튼과 탄약 표시가 쓴다.
+	_feed.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_feed.offset_top = MARGIN
-	_feed.offset_right = -MARGIN
+	_feed.offset_left = 110
 	_feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_feed)
 	_notice_label = _make_label(root, 24, Control.PRESET_CENTER)
@@ -104,6 +104,19 @@ func flash_damage() -> void:
 	_damage_overlay.color.a = 0.35
 
 
+## 터치 조작용 배치. 오른쪽 아래는 버튼이 차지하므로 탄약과 무기 이름을 오른쪽 위로 옮긴다.
+func use_touch_layout() -> void:
+	for label: Label in [_ammo_label, _weapon_label]:
+		label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		label.grow_vertical = Control.GROW_DIRECTION_END
+		label.offset_right = -MARGIN
+	_ammo_label.offset_top = MARGIN - 8
+	_ammo_label.offset_bottom = MARGIN + 40
+	_weapon_label.offset_top = MARGIN + 44
+	_weapon_label.offset_bottom = MARGIN + 72
+
+
 ## 점령전 거점 상태. 각 항목은 [표시할 글자, 색].
 func set_zones(items: Array) -> void:
 	while _zone_row.get_child_count() < items.size():
@@ -123,7 +136,7 @@ func add_feed_line(text: String, color: Color) -> void:
 	var label := Label.new()
 	label.text = text
 	label.modulate = color
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	label.add_theme_font_size_override("font_size", 22)
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.8))
 	label.add_theme_constant_override("outline_size", 4)

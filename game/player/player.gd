@@ -15,6 +15,7 @@ const InputCmd := preload("res://game/player/input_cmd.gd")
 const WeaponController := preload("res://game/weapons/weapon_controller.gd")
 const ViewModel := preload("res://game/weapons/view_model.gd")
 const Hud := preload("res://game/ui/hud.gd")
+const TouchControls := preload("res://game/ui/touch_controls.gd")
 const SfxSynth := preload("res://game/audio/sfx_synth.gd")
 const LOADOUT := [
 	preload("res://game/weapons/data/rifle_vk7.tres"),
@@ -27,6 +28,8 @@ const Settings := preload("res://game/core/settings.gd")
 const CORRECTION_SMOOTHING := 12.0
 const CORRECTION_SNAP_DISTANCE := 2.0
 const DAMAGE_MARK_TIME := 1.5
+## 터치로 화면을 끌 때의 시선 감도(화면 단위당 라디안).
+const TOUCH_LOOK_SENSITIVITY := 0.0045
 const BASE_SENSITIVITY := 0.002
 const ADS_SENSITIVITY_SCALE := 0.6
 const PITCH_LIMIT := 1.55
@@ -61,6 +64,8 @@ var sensitivity_scale := 1.0
 var weapon: WeaponController
 var view_model: ViewModel
 var hud: Hud
+## 터치 조작. 터치 기기에서만 만들어진다.
+var touch: TouchControls
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _sprinting := false
@@ -71,6 +76,7 @@ var _mantle_progress := 0.0
 var _prev_buttons := 0
 var _suppress_fire := false
 var _selected_slot := 0
+var _touch_paused := false
 var _visual_offset := Vector3.ZERO
 ## 최근에 나를 맞힌 위치들. 각 항목은 [위치, 남은 표시 시간].
 var _damage_sources: Array = []
@@ -108,11 +114,34 @@ func _ready() -> void:
 	if is_local:
 		hud.set_health(health, MAX_HEALTH)
 		sensitivity_scale = Settings.sensitivity()
+		if Settings.is_mobile() and not view_from_cmd:
+			enable_touch()
 
 
 ## 입력을 받아도 되는 상태인지. 브라우저에서는 클릭으로 포인터를 잠근 뒤부터 조작한다.
 func input_active() -> bool:
+	if touch != null:
+		return not _touch_paused
 	return not require_mouse_capture or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+
+
+## 터치 조작을 켠다. 휴대폰에서는 시작할 때, 그 밖의 터치 기기에서는 처음 화면을 만졌을 때 켜진다.
+func enable_touch() -> void:
+	if touch != null or not is_local:
+		return
+	touch = TouchControls.new()
+	hud.add_child(touch)
+	hud.use_touch_layout()
+	touch.look.connect(_on_touch_look)
+	touch.pause_pressed.connect(set_paused.bind(true))
+
+
+## 터치 조작에서의 일시 정지. 마우스 조작은 포인터 잠금 여부로 판단하므로 영향받지 않는다.
+func set_paused(paused: bool) -> void:
+	_touch_paused = paused
+	if touch != null:
+		touch.visible = not paused
+		touch.release_all()
 
 
 func horizontal_speed() -> float:
@@ -157,6 +186,13 @@ func gather_cmd() -> InputCmd:
 	cmd.yaw = rotation.y
 	cmd.pitch = _head.rotation.x
 	if not input_active():
+		return cmd
+	if touch != null:
+		cmd.move = touch.move
+		cmd.buttons = touch.buttons()
+		var steps := touch.take_weapon_steps()
+		_selected_slot = (_selected_slot + steps) % LOADOUT.size()
+		cmd.weapon = _selected_slot
 		return cmd
 	cmd.move = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	for action: String in _button_actions:
@@ -286,8 +322,22 @@ func show_hit(headshot: bool, killed: bool) -> void:
 		_play("hit")
 
 
+func _input(event: InputEvent) -> void:
+	# 터치를 감지하면 그때부터 터치 조작으로 바꾼다(태블릿, 터치 노트북).
+	if touch == null and is_local and not view_from_cmd and event is InputEventScreenTouch:
+		enable_touch()
+
+
+func _on_touch_look(relative: Vector2) -> void:
+	var zoom := lerpf(1.0, weapon.data.ads_fov / BASE_FOV, weapon.aim_blend)
+	var sensitivity := TOUCH_LOOK_SENSITIVITY * sensitivity_scale * zoom
+	add_view_rotation(-relative.x * sensitivity, -relative.y * sensitivity)
+	view_model.add_look_delta(relative)
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if not is_local or view_from_cmd:
+	# 터치 기기에서는 터치가 마우스 입력으로도 들어오므로 마우스 처리를 건너뛴다.
+	if not is_local or view_from_cmd or touch != null:
 		return
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseButton and event.is_pressed() and not captured:
