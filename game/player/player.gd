@@ -16,6 +16,7 @@ const WeaponController := preload("res://game/weapons/weapon_controller.gd")
 const ViewModel := preload("res://game/weapons/view_model.gd")
 const Hud := preload("res://game/ui/hud.gd")
 const TouchControls := preload("res://game/ui/touch_controls.gd")
+const AimAssist := preload("res://game/player/aim_assist.gd")
 const SfxSynth := preload("res://game/audio/sfx_synth.gd")
 const LOADOUT := [
 	preload("res://game/weapons/data/rifle_vk7.tres"),
@@ -66,6 +67,8 @@ var view_model: ViewModel
 var hud: Hud
 ## 터치 조작. 터치 기기에서만 만들어진다.
 var touch: TouchControls
+## 조준 보조 대상(보이는 적의 가슴 위치). 터치 조작일 때 세션이 매 틱 채운다.
+var assist_targets: Array = []
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _sprinting := false
@@ -77,6 +80,7 @@ var _prev_buttons := 0
 var _suppress_fire := false
 var _selected_slot := 0
 var _touch_paused := false
+var _assist_slow := 1.0
 var _visual_offset := Vector3.ZERO
 ## 최근에 나를 맞힌 위치들. 각 항목은 [위치, 남은 표시 시간].
 var _damage_sources: Array = []
@@ -330,7 +334,7 @@ func _input(event: InputEvent) -> void:
 
 func _on_touch_look(relative: Vector2) -> void:
 	var zoom := lerpf(1.0, weapon.data.ads_fov / BASE_FOV, weapon.aim_blend)
-	var sensitivity := TOUCH_LOOK_SENSITIVITY * sensitivity_scale * zoom
+	var sensitivity := TOUCH_LOOK_SENSITIVITY * sensitivity_scale * zoom * _assist_slow
 	add_view_rotation(-relative.x * sensitivity, -relative.y * sensitivity)
 	view_model.add_look_delta(relative)
 
@@ -388,6 +392,12 @@ func _process(delta: float) -> void:
 
 	_visual_offset = _visual_offset.lerp(Vector3.ZERO, clampf(delta * CORRECTION_SMOOTHING, 0.0, 1.0))
 	_camera.position = _head.global_transform.basis.inverse() * _visual_offset
+
+	_assist_slow = 1.0
+	if touch != null and alive and not _touch_paused:
+		var assist := AimAssist.evaluate(eye_position(), rotation.y, _head.rotation.x, assist_targets)
+		_assist_slow = assist[0]
+		add_view_rotation(float(assist[1]) * delta, float(assist[2]) * delta)
 
 	var marks: Array = []
 	for source: Array in _damage_sources:

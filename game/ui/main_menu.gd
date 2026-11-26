@@ -7,6 +7,7 @@ signal start_requested(kind: String, options: Dictionary)
 const MenuKit := preload("res://game/ui/menu_kit.gd")
 const Settings := preload("res://game/core/settings.gd")
 const DEFAULT_ADDRESS := "127.0.0.1:7777"
+const DIFFICULTIES := ["easy", "normal", "hard"]
 
 var play_button: Button
 var range_button: Button
@@ -14,6 +15,8 @@ var join_button: Button
 var address_edit: LineEdit
 var bot_count: SpinBox
 var mode_select: OptionButton
+var difficulty_select: OptionButton
+var low_graphics: CheckButton
 
 
 func _ready() -> void:
@@ -41,6 +44,23 @@ func _ready() -> void:
 	mode_select.selected = 1 if str(Settings.read(Settings.GAME_MODE, "tdm")) == "dom" else 0
 	bots_row.add_child(mode_select)
 	column.add_child(bots_row)
+
+	var options_row := HBoxContainer.new()
+	options_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	options_row.add_theme_constant_override("separation", 12)
+	difficulty_select = OptionButton.new()
+	for level: String in DIFFICULTIES:
+		difficulty_select.add_item("Bots: %s" % level.capitalize())
+	difficulty_select.selected = maxi(DIFFICULTIES.find(Settings.difficulty()), 0)
+	options_row.add_child(difficulty_select)
+	low_graphics = CheckButton.new()
+	low_graphics.text = "Low graphics"
+	low_graphics.button_pressed = Settings.low_graphics()
+	low_graphics.toggled.connect(
+		func(enabled: bool) -> void: Settings.write(Settings.LOW_GRAPHICS, enabled)
+	)
+	options_row.add_child(low_graphics)
+	column.add_child(options_row)
 
 	range_button = MenuKit.button("SHOOTING RANGE")
 	range_button.pressed.connect(func() -> void: start_requested.emit("range", {}))
@@ -70,8 +90,10 @@ func _on_play() -> void:
 	var bots := int(bot_count.value)
 	var game_mode := "dom" if mode_select.selected == 1 else "tdm"
 	Settings.write(Settings.BOT_COUNT, bots)
+	var difficulty: String = DIFFICULTIES[difficulty_select.selected]
 	Settings.write(Settings.GAME_MODE, game_mode)
-	start_requested.emit("bots", {"bots": bots, "mode": game_mode})
+	Settings.write(Settings.DIFFICULTY, difficulty)
+	start_requested.emit("bots", {"bots": bots, "mode": game_mode, "difficulty": difficulty})
 
 
 func _on_join() -> void:

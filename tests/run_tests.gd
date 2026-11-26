@@ -13,6 +13,7 @@ const SUITES := {
 	"domination": preload("res://tests/test_domination.gd"),
 	"touch": preload("res://tests/test_touch.gd"),
 	"nav": preload("res://tests/test_nav.gd"),
+	"rules": preload("res://tests/test_rules.gd"),
 }
 
 

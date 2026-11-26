@@ -11,6 +11,7 @@ extends Node
 ## 명령줄 인자(godot ... -- 뒤에 붙인다):
 ##   --range                     사격 연습장
 ##   --mode=tdm|dom              경기 방식: 팀 데스매치(기본) 또는 점령전
+##   --difficulty=easy|normal|hard 봇 난이도
 ##   --bots=5                    봇 수(로컬 대전 기본 5, 서버 기본 0)
 ##   --spectate                  로컬 대전을 사람 없이 봇끼리만 진행(자동 테스트)
 ##   --server --port=7777        서버로 실행
@@ -51,10 +52,9 @@ const INTERMISSION_TIME := 8.0
 const LOCAL_ID := 1
 const BOT_SIGHT_RANGE := 60.0
 const BOT_NEAR_RANGE := 10.0
-const TEAM_NAMES := ["BLUE", "RED"]
-## 0번이 아군 색, 1번이 적군 색.
-const TEAM_COLORS := [Color(0.25, 0.45, 0.9), Color(0.85, 0.25, 0.2)]
-const NEUTRAL_COLOR := Color(0.75, 0.75, 0.75)
+const MatchView := preload("res://game/net/match_view.gd")
+const Vitals := preload("res://game/match/vitals.gd")
+const SpawnPicker := preload("res://game/match/spawn_picker.gd")
 
 var mode := Mode.LOCAL_MATCH
 var stats := {
@@ -99,8 +99,8 @@ var _navigator: NavGraph
 var _last_local_health := Protocol.MAX_HEALTH
 ## 점령전일 때만 있다. 판정 권한이 있는 쪽이 갱신한다.
 var _domination: Domination
-var _zone_markers: Array = []
-var _own_team := 0
+var _view := MatchView.new()
+var _difficulty := "normal"
 # 클라이언트 전용
 var _seq := 0
 ## 아직 서버 확인을 받지 못한 입력. 각 항목은 [seq, 입력, 그 입력을 적용한 뒤의 예측 상태].
@@ -170,6 +170,7 @@ func pause_menu() -> PauseMenu:
 
 func _start_from_args() -> void:
 	_started = true
+	_difficulty = str(_args.get("difficulty", "normal"))
 	_set_game_mode(str(_args.get("mode", "tdm")))
 	if _args.has("server") or OS.has_feature("dedicated_server"):
 		_start_server(int(_args.get("port", str(Protocol.DEFAULT_PORT))))
@@ -203,9 +204,11 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 			_local = _spawn_player(true, 0)
 		_:
 			mode = Mode.LOCAL_MATCH
+			_difficulty = str(options.get("difficulty", Settings.difficulty()))
 			_set_game_mode(str(options.get("mode", "tdm")))
 			_local = _add_participant(LOCAL_ID, "local")["player"]
 			_add_bots(int(options.get("bots", 5)))
+	_apply_quality()
 	_pause = PauseMenu.new()
 	_pause.visible = false
 	_pause.resume_requested.connect(_resume)
@@ -225,53 +228,32 @@ func _score_limit() -> int:
 	return Domination.SCORE_LIMIT if _domination != null else SCORE_LIMIT
 
 
-## 거점 표시와 HUD를 갱신한다. zone_states의 각 항목은 [소유 팀, 진행도, 점령 중인 팀].
-func _show_zones(zone_states: Array) -> void:
-	if zone_states.is_empty():
-		return
-	var zones: Array = _map.call("capture_zones")
-	while _zone_markers.size() < zones.size():
-		var zone: Array = zones[_zone_markers.size()]
-		var marker := ZoneMarker.new(str(zone[0]))
-		marker.position = zone[1]
-		add_child(marker)
-		_zone_markers.append(marker)
-	var items: Array = []
-	for index in zone_states.size():
-		var row: Array = zone_states[index]
-		var color := _relative_color(int(row[0]))
-		var text := str(zones[index][0])
-		if float(row[1]) > 0.0:
-			text += " %d%%" % int(float(row[1]) * 100.0)
-			_zone_markers[index].set_state(_relative_color(int(row[2])), float(row[1]))
-		else:
-			_zone_markers[index].set_state(color, 0.0)
-		items.append([text, color])
-	if _local != null and _local.hud != null:
-		_local.hud.set_zones(items)
+func _apply_quality() -> void:
+	Settings.apply_quality(_map, get_viewport())
 
 
-func _relative_color(team: int) -> Color:
-	if team < 0:
-		return NEUTRAL_COLOR
-	return TEAM_COLORS[0 if team == _own_team else 1]
-
-
-func _name_of(id: int, own_id: int) -> String:
-	if id == own_id:
-		return "YOU"
-	if id >= 1000:
-		return "BOT-%d" % (id - 999)
-	return "P-%d" % (id % 1000)
-
-
-func _show_kill(killer: int, victim: int, killer_team: int, headshot: bool, own_id: int) -> void:
-	if _local == null or _local.hud == null:
-		return
-	var text := "%s  >  %s" % [_name_of(killer, own_id), _name_of(victim, own_id)]
-	if headshot:
-		text += "  (HS)"
-	_local.hud.add_feed_line(text, _relative_color(killer_team))
+## 터치 조작의 조준 보조에 쓸, 지금 보이는 적들의 가슴 위치.
+func _update_assist_targets() -> void:
+	var targets: Array = []
+	var eye: Vector3 = _local.eye_position()
+	var candidates: Array = []
+	if mode == Mode.CLIENT:
+		for id: int in _avatars:
+			var avatar: RemoteAvatar = _avatars[id]
+			if avatar.alive and int(avatar.get_meta("team", -1)) != _view.own_team:
+				candidates.append([avatar.position, avatar.low])
+	else:
+		for id: int in _peers:
+			var other = _peers[id]["player"]
+			if int(_peers[id]["team"]) != _view.own_team and other.alive:
+				candidates.append([other.global_position, other.is_low()])
+	for candidate: Array in candidates:
+		var chest: Vector3 = candidate[0] + Vector3.UP * (0.7 if candidate[1] else 1.1)
+		var offset := chest - eye
+		var wall: Dictionary = _local.weapon.world_ray(eye, offset.normalized(), 1)
+		if wall.is_empty() or eye.distance_to(wall["position"]) >= offset.length():
+			targets.append(chest)
+	_local.assist_targets = targets
 
 
 func _resume() -> void:
@@ -295,6 +277,9 @@ func _return_to_menu() -> void:
 func _physics_process(delta: float) -> void:
 	if not _started:
 		return
+	# 혼자 하는 봇 대전은 일시 정지하면 실제로 멈춘다. 네트워크 대전은 멈출 수 없다.
+	if mode == Mode.LOCAL_MATCH and _pause != null and _pause.visible:
+		return
 	_tick += 1
 	_elapsed += delta
 	match mode:
@@ -305,6 +290,8 @@ func _physics_process(delta: float) -> void:
 		_:
 			if _local != null:
 				_local.simulate(_next_local_cmd(delta), delta)
+	if _local != null and _local.touch != null:
+		_update_assist_targets()
 	if _exit_after > 0.0 and _elapsed >= _exit_after:
 		_finish()
 
@@ -410,6 +397,7 @@ func _add_bots(count: int) -> void:
 		# 봇은 소총, 기관단총, 산탄총을 번갈아 든다. 저격총은 봇의 조준 방식과 맞지 않아 뺀다.
 		bot.weapon_slot = index % 3
 		bot.navigator = _navigator
+		bot.set_difficulty(_difficulty)
 		entry["bot"] = bot
 
 
@@ -424,7 +412,11 @@ func _add_participant(id: int, kind: String) -> Dictionary:
 		player.view_from_cmd = true
 		player.require_mouse_capture = false
 	player.weapon.resolve_shot = _resolve_shot.bind(id)
+	player.weapon.fired.connect(_on_participant_fired.bind(id))
 	var entry := {
+		"fired": false,
+		"since_damage": 999.0,
+		"protected": 0.0,
 		"kind": kind,
 		"player": player,
 		"team": team,
@@ -450,38 +442,34 @@ func _add_participant(id: int, kind: String) -> Dictionary:
 	return entry
 
 
-## 팀 스폰 중 살아 있는 적에게서 가장 먼 곳을 고른다. 적이 없으면 팀별로 정해진 자리를 쓴다.
+## 참가자가 발사했을 때: 다른 사람에게 총소리를 들려주고, 리스폰 보호를 푼다.
+func _on_participant_fired(_kick: Vector2, id: int) -> void:
+	if not _peers.has(id):
+		return
+	var entry: Dictionary = _peers[id]
+	entry["fired"] = true
+	entry["protected"] = 0.0
+	if entry["avatar"] != null:
+		entry["avatar"].play_shot()
+
+
+## 팀 스폰 중 살아 있는 적에게서 가장 먼 곳을 고른다.
 func _pick_spawn(team: int, self_id: int) -> int:
-	# 팀별 스폰이 정해진 맵에서는 자기 진영에서만 고른다.
-	# 팀 스폰이 없는 맵(테스트용 평지)은 팀 번호로 자리가 정해져 결과가 매번 같다.
-	var candidates: Array = range(int(_map.call("spawn_count")))
-	var best: int = candidates[team % candidates.size()]
-	if _map.has_method("spawn_indices_for"):
-		candidates = _map.call("spawn_indices_for", team)
-		best = candidates[self_id % candidates.size()]
-	var best_distance := -1.0
-	for index: int in candidates:
-		var spot: Transform3D = _map.call("spawn_point", index)
-		var nearest := INF
-		for other: int in _peers:
-			var entry: Dictionary = _peers[other]
-			if other == self_id or int(entry["team"]) == team or not entry["player"].alive:
-				continue
-			nearest = minf(nearest, spot.origin.distance_to(entry["player"].global_position))
-		if nearest != INF and nearest > best_distance:
-			best_distance = nearest
-			best = index
-	return best
+	var enemies: Array = []
+	for other: int in _peers:
+		var entry: Dictionary = _peers[other]
+		if other != self_id and int(entry["team"]) != team and entry["player"].alive:
+			enemies.append(entry["player"].global_position)
+	return SpawnPicker.pick(_map, team, self_id, enemies)
 
 
 func _recolor_avatars() -> void:
-	var own_team := 0
 	if _peers.has(LOCAL_ID):
-		own_team = int(_peers[LOCAL_ID]["team"])
+		_view.own_team = int(_peers[LOCAL_ID]["team"])
 	for id: int in _peers:
 		var avatar: RemoteAvatar = _peers[id]["avatar"]
 		if avatar != null:
-			avatar.set_color(TEAM_COLORS[0 if int(_peers[id]["team"]) == own_team else 1])
+			avatar.set_color(_view.relative_color(int(_peers[id]["team"])))
 
 
 ## 클라이언트가 보낸 입력을 받는다. 보낸 쪽을 믿지 않고 형식, 순서, 양을 모두 검사한다.
@@ -513,6 +501,11 @@ func _tick_authority(delta: float) -> void:
 			entry["respawn"] = float(entry["respawn"]) - delta
 			if float(entry["respawn"]) <= 0.0:
 				_respawn(id, entry)
+		entry["since_damage"] = float(entry["since_damage"]) + delta
+		entry["protected"] = maxf(float(entry["protected"]) - delta, 0.0)
+		player.health = Vitals.regenerate(
+			player.health, Protocol.MAX_HEALTH, float(entry["since_damage"]), delta
+		)
 		match str(entry["kind"]):
 			"peer":
 				_simulate_peer(entry, delta, frozen)
@@ -640,6 +633,8 @@ func _respawn(id: int, entry: Dictionary) -> void:
 	player.move_state = 0
 	player.crouching = false
 	player.weapon.reset()
+	entry["protected"] = Vitals.SPAWN_PROTECTION
+	entry["since_damage"] = 999.0
 	(entry["history"] as Array).clear()
 
 
@@ -652,6 +647,9 @@ func _send_snapshots() -> void:
 			flags |= Protocol.FLAG_LOW
 		if player.alive:
 			flags |= Protocol.FLAG_ALIVE
+		if _peers[id]["fired"]:
+			flags |= Protocol.FLAG_FIRED
+			_peers[id]["fired"] = false
 		rows.append([id, player.global_position, player.rotation.y, flags, _peers[id]["team"]])
 	for id: int in _peers:
 		var entry: Dictionary = _peers[id]
@@ -670,42 +668,20 @@ func _send_snapshots() -> void:
 ## 로컬 대전에서 내 HUD를 갱신한다.
 func _update_local_hud() -> void:
 	var entry: Dictionary = _peers[LOCAL_ID]
-	_own_team = int(entry["team"])
+	_view.own_team = int(entry["team"])
 	if _domination != null:
-		_show_zones(_domination.state())
+		_view.show_zones(self, _local.hud, _map.call("capture_zones"), _domination.state())
 	if _local.health < _last_local_health:
 		_local.hud.flash_damage()
 	_last_local_health = _local.health
 	_local.hud.set_health(_local.health, Protocol.MAX_HEALTH)
-	_show_match_hud(
-		int(entry["team"]), _team_scores[0], _team_scores[1], _time_left,
-		_intermission_left > 0.0, int(entry["kills"]), int(entry["deaths"]), _local.alive
+	_view.show_match(
+		_local.hud,
+		[
+			entry["team"], _team_scores[0], _team_scores[1], _time_left,
+			_intermission_left > 0.0, entry["kills"], entry["deaths"], _local.alive,
+		]
 	)
-
-
-## 점수판과 가운데 안내 문구. 로컬 대전과 네트워크 클라이언트가 함께 쓴다.
-func _show_match_hud(
-	team: int, score_a: int, score_b: int, time_left: float,
-	finished: bool, kills: int, deaths: int, alive: bool
-) -> void:
-	var seconds := int(ceilf(time_left))
-	var clock := "%d:%02d" % [seconds / 60, seconds % 60]
-	_local.hud.set_score(
-		"%s %d  -  %d %s    %s    K %d  D %d  [%s]"
-		% [TEAM_NAMES[0], score_a, score_b, TEAM_NAMES[1], clock, kills, deaths, TEAM_NAMES[team]]
-	)
-	var message := ""
-	if finished:
-		var own := score_a if team == 0 else score_b
-		var other := score_b if team == 0 else score_a
-		message = "DRAW"
-		if own > other:
-			message = "VICTORY"
-		elif own < other:
-			message = "DEFEAT"
-	elif not alive:
-		message = "RESPAWNING"
-	_local.hud.set_message(message)
 
 
 ## 서버 판정. 쏜 사람이 화면에서 보던 시점(view_tick)으로 상대 위치를 되감아 맞았는지 계산한다.
@@ -732,8 +708,10 @@ func _resolve_shot(origin: Vector3, direction: Vector3, shooter_id: int) -> void
 	for id: int in _peers:
 		if id == shooter_id or not _peers[id]["player"].alive:
 			continue
-		# 같은 팀은 맞지 않는다.
+		# 같은 팀과 방금 리스폰한 상대는 맞지 않는다.
 		if int(_peers[id]["team"]) == int(shooter_entry["team"]):
+			continue
+		if float(_peers[id]["protected"]) > 0.0:
 			continue
 		var past: Array = HitMath.history_at(_peers[id]["history"], rewind_tick)
 		if past.is_empty():
@@ -752,6 +730,7 @@ func _resolve_shot(origin: Vector3, direction: Vector3, shooter_id: int) -> void
 	var target = target_entry["player"]
 	var amount: float = WeaponState.damage_at(shooter.weapon.data, best_distance, best_headshot)
 	target.health = maxf(target.health - amount, 0.0)
+	target_entry["since_damage"] = 0.0
 	var killed: bool = target.health <= 0.0
 	if killed:
 		target.alive = false
@@ -774,7 +753,8 @@ func _resolve_shot(origin: Vector3, direction: Vector3, shooter_id: int) -> void
 
 func _announce_kill(killer: int, victim: int, killer_team: int, headshot: bool) -> void:
 	if mode == Mode.LOCAL_MATCH:
-		_show_kill(killer, victim, killer_team, headshot, LOCAL_ID)
+		var hud = _local.hud if _local != null else null
+		_view.show_kill(hud, killer, victim, killer_team, headshot, LOCAL_ID)
 		return
 	for id: int in _peers:
 		if str(_peers[id]["kind"]) == "peer":
@@ -881,8 +861,9 @@ func _rpc_damaged(from: Vector3) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func _rpc_kill(killer: int, victim: int, killer_team: int, headshot: bool) -> void:
-	if mode == Mode.CLIENT:
-		_show_kill(killer, victim, killer_team, headshot, multiplayer.get_unique_id())
+	if mode == Mode.CLIENT and _local != null:
+		var own_id := multiplayer.get_unique_id()
+		_view.show_kill(_local.hud, killer, victim, killer_team, headshot, own_id)
 
 
 func _apply_snapshot(
@@ -890,6 +871,7 @@ func _apply_snapshot(
 ) -> void:
 	stats["snapshots"] += 1
 	_latest_tick = maxi(_latest_tick, tick)
+	_view.own_team = int(status[5])
 
 	var seen := {}
 	for row: Array in others:
@@ -904,7 +886,10 @@ func _apply_snapshot(
 		var is_low := (flags & Protocol.FLAG_LOW) != 0
 		var is_alive := (flags & Protocol.FLAG_ALIVE) != 0
 		avatar.push(tick, row[1], row[2], is_low, is_alive)
-		avatar.set_color(TEAM_COLORS[0 if int(row[4]) == int(status[5]) else 1])
+		avatar.set_color(_view.relative_color(int(row[4])))
+		avatar.set_meta("team", int(row[4]))
+		if (flags & Protocol.FLAG_FIRED) != 0:
+			avatar.play_shot()
 	for id: int in _avatars.keys():
 		if not seen.has(id):
 			_avatars[id].queue_free()
@@ -913,13 +898,12 @@ func _apply_snapshot(
 	if _local == null:
 		return
 	_local.apply_net_status(float(status[0]), bool(status[1]), int(status[2]), int(status[10]))
-	_own_team = int(status[5])
-	_show_zones(status[11])
-	if _local.hud != null:
-		_show_match_hud(
-			int(status[5]), int(status[6]), int(status[7]), float(status[8]),
-			bool(status[9]), int(status[3]), int(status[4]), bool(status[1])
-		)
+	_view.show_match(
+		_local.hud,
+		[status[5], status[6], status[7], status[8], status[9], status[3], status[4], status[1]]
+	)
+	if not (status[11] as Array).is_empty():
+		_view.show_zones(self, _local.hud, _map.call("capture_zones"), status[11])
 	_reconcile(last_seq, own, delta)
 
 

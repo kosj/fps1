@@ -56,6 +56,29 @@ func _init(p_seed: int = 1, start_yaw: float = 0.0) -> void:
 	_yaw = start_yaw
 
 
+## 난이도를 정한다: "easy", "normal", "hard". 모르는 값은 normal로 본다.
+func set_difficulty(level: String) -> void:
+	match level:
+		"easy":
+			reaction_time = 0.85
+			turn_speed = 3.2
+			aim_error_start = 0.17
+			aim_error_min = 0.065
+			settle_time = 2.2
+		"hard":
+			reaction_time = 0.3
+			turn_speed = 6.0
+			aim_error_start = 0.07
+			aim_error_min = 0.015
+			settle_time = 1.0
+		_:
+			reaction_time = 0.5
+			turn_speed = 4.5
+			aim_error_start = 0.11
+			aim_error_min = 0.03
+			settle_time = 1.5
+
+
 ## eye와 feet는 자기 위치, speed는 현재 수평 속력, enemies는 지금 보이는 적들의 발 위치,
 ## nav_points는 돌아다닐 지점 목록.
 func make_cmd(
