@@ -49,6 +49,13 @@ const EXTRA_NAV_POINTS := [
 	Vector3(-12.0, 0.0, -28.0),
 ]
 
+## 점령전 거점. 각 항목은 [이름, 중심 위치].
+const CAPTURE_ZONES := [
+	["A", Vector3(-10.0, 0.0, -6.0)],
+	["B", Vector3(0.0, 0.0, -18.0)],
+	["C", Vector3(10.0, 0.0, -26.0)],
+]
+
 @onready var _sun: DirectionalLight3D = $Sun
 
 
@@ -65,6 +72,10 @@ func _ready() -> void:
 
 
 ## 세션이 플레이어를 놓을 자리. 인원이 스폰 수보다 많으면 처음부터 다시 쓴다.
+func capture_zones() -> Array:
+	return CAPTURE_ZONES
+
+
 func spawn_count() -> int:
 	return SPAWNS.size()
 

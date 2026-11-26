@@ -5,6 +5,7 @@ const PATH := "user://settings.cfg"
 const SENSITIVITY := "input/sensitivity_scale"
 const BOT_COUNT := "match/bots"
 const SERVER_ADDRESS := "match/server_address"
+const GAME_MODE := "match/mode"
 const MIN_SENSITIVITY := 0.2
 const MAX_SENSITIVITY := 4.0
 

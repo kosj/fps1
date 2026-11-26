@@ -10,6 +10,7 @@ extends Node
 ##
 ## 명령줄 인자(godot ... -- 뒤에 붙인다):
 ##   --range                     사격 연습장
+##   --mode=tdm|dom              경기 방식: 팀 데스매치(기본) 또는 점령전
 ##   --bots=5                    봇 수(로컬 대전 기본 5, 서버 기본 0)
 ##   --spectate                  로컬 대전을 사람 없이 봇끼리만 진행(자동 테스트)
 ##   --server --port=7777        서버로 실행
@@ -30,6 +31,8 @@ const WeaponState := preload("res://game/weapons/weapon_state.gd")
 const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
+const Domination := preload("res://game/match/domination.gd")
+const ZoneMarker := preload("res://game/match/zone_marker.gd")
 const MainMenu := preload("res://game/ui/main_menu.gd")
 const PauseMenu := preload("res://game/ui/pause_menu.gd")
 ## 이 인자가 하나라도 있으면 메뉴 없이 바로 시작한다(서버, 자동 테스트, 웹 주소창 접속).
@@ -45,7 +48,9 @@ const LOCAL_ID := 1
 const BOT_SIGHT_RANGE := 60.0
 const BOT_NEAR_RANGE := 10.0
 const TEAM_NAMES := ["BLUE", "RED"]
+## 0번이 아군 색, 1번이 적군 색.
 const TEAM_COLORS := [Color(0.25, 0.45, 0.9), Color(0.85, 0.25, 0.2)]
+const NEUTRAL_COLOR := Color(0.75, 0.75, 0.75)
 
 var mode := Mode.LOCAL_MATCH
 var stats := {
@@ -63,6 +68,7 @@ var stats := {
 	"rejected_inputs": 0,
 	"total_kills": 0,
 	"matches_finished": 0,
+	"zone_captures": 0,
 }
 
 var _args := {}
@@ -86,6 +92,10 @@ var _time_left := MATCH_TIME
 var _intermission_left := 0.0
 var _nav_points: Array = []
 var _last_local_health := Protocol.MAX_HEALTH
+## 점령전일 때만 있다. 판정 권한이 있는 쪽이 갱신한다.
+var _domination: Domination
+var _zone_markers: Array = []
+var _own_team := 0
 # 클라이언트 전용
 var _seq := 0
 ## 아직 서버 확인을 받지 못한 입력. 각 항목은 [seq, 입력, 그 입력을 적용한 뒤의 예측 상태].
@@ -145,6 +155,7 @@ func pause_menu() -> PauseMenu:
 
 func _start_from_args() -> void:
 	_started = true
+	_set_game_mode(str(_args.get("mode", "tdm")))
 	if _args.has("server") or OS.has_feature("dedicated_server"):
 		_start_server(int(_args.get("port", str(Protocol.DEFAULT_PORT))))
 		_add_bots(int(_args.get("bots", "0")))
@@ -176,6 +187,7 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 			_local = _spawn_player(true, 0)
 		_:
 			mode = Mode.LOCAL_MATCH
+			_set_game_mode(str(options.get("mode", "tdm")))
 			_local = _add_participant(LOCAL_ID, "local")["player"]
 			_add_bots(int(options.get("bots", 5)))
 	_pause = PauseMenu.new()
@@ -184,6 +196,66 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 	_pause.menu_requested.connect(_return_to_menu)
 	_pause.sensitivity_changed.connect(_on_sensitivity_changed)
 	add_child(_pause)
+
+
+## 점령전은 맵에 거점이 있을 때만 켠다. 없으면 팀 데스매치로 진행한다.
+func _set_game_mode(game_mode: String) -> void:
+	if game_mode != "dom" or not _map.has_method("capture_zones"):
+		return
+	_domination = Domination.new(_map.call("capture_zones"))
+
+
+func _score_limit() -> int:
+	return Domination.SCORE_LIMIT if _domination != null else SCORE_LIMIT
+
+
+## 거점 표시와 HUD를 갱신한다. zone_states의 각 항목은 [소유 팀, 진행도, 점령 중인 팀].
+func _show_zones(zone_states: Array) -> void:
+	if zone_states.is_empty():
+		return
+	var zones: Array = _map.call("capture_zones")
+	while _zone_markers.size() < zones.size():
+		var zone: Array = zones[_zone_markers.size()]
+		var marker := ZoneMarker.new(str(zone[0]))
+		marker.position = zone[1]
+		add_child(marker)
+		_zone_markers.append(marker)
+	var items: Array = []
+	for index in zone_states.size():
+		var row: Array = zone_states[index]
+		var color := _relative_color(int(row[0]))
+		var text := str(zones[index][0])
+		if float(row[1]) > 0.0:
+			text += " %d%%" % int(float(row[1]) * 100.0)
+			_zone_markers[index].set_state(_relative_color(int(row[2])), float(row[1]))
+		else:
+			_zone_markers[index].set_state(color, 0.0)
+		items.append([text, color])
+	if _local != null and _local.hud != null:
+		_local.hud.set_zones(items)
+
+
+func _relative_color(team: int) -> Color:
+	if team < 0:
+		return NEUTRAL_COLOR
+	return TEAM_COLORS[0 if team == _own_team else 1]
+
+
+func _name_of(id: int, own_id: int) -> String:
+	if id == own_id:
+		return "YOU"
+	if id >= 1000:
+		return "BOT-%d" % (id - 999)
+	return "P-%d" % (id % 1000)
+
+
+func _show_kill(killer: int, victim: int, killer_team: int, headshot: bool, own_id: int) -> void:
+	if _local == null or _local.hud == null:
+		return
+	var text := "%s  >  %s" % [_name_of(killer, own_id), _name_of(victim, own_id)]
+	if headshot:
+		text += "  (HS)"
+	_local.hud.add_feed_line(text, _relative_color(killer_team))
 
 
 func _on_sensitivity_changed(value: float) -> void:
@@ -480,8 +552,17 @@ func _bot_cmd(id: int, entry: Dictionary, delta: float) -> InputCmd:
 			continue
 		visible.append(target.global_position)
 	var bot: CombatBot = entry["bot"]
+	var goals := _nav_points
+	bot.has_hold = false
+	if _domination != null:
+		var team := int(entry["team"])
+		goals = _domination.objectives_for(team, player.global_position)
+		var hold := _domination.hold_zone_for(team, player.global_position)
+		if hold >= 0:
+			bot.has_hold = true
+			bot.hold_point = _domination.centers[hold]
 	return bot.make_cmd(
-		delta, eye, player.global_position, player.horizontal_speed(), visible, _nav_points
+		delta, eye, player.global_position, player.horizontal_speed(), visible, goals
 	)
 
 
@@ -493,7 +574,16 @@ func _update_match(delta: float) -> void:
 			_start_new_match()
 		return
 	_time_left -= delta
-	var limit_reached: bool = maxi(_team_scores[0], _team_scores[1]) >= SCORE_LIMIT
+	if _domination != null:
+		var positions := [[], []]
+		for id: int in _peers:
+			var player = _peers[id]["player"]
+			if player.alive:
+				positions[int(_peers[id]["team"])].append(player.global_position)
+		_domination.update(delta, positions)
+		_team_scores = [int(_domination.scores[0]), int(_domination.scores[1])]
+		stats["zone_captures"] = _domination.captures
+	var limit_reached: bool = maxi(_team_scores[0], _team_scores[1]) >= _score_limit()
 	if _time_left <= 0.0 or limit_reached:
 		_time_left = 0.0
 		_intermission_left = INTERMISSION_TIME
@@ -504,6 +594,8 @@ func _update_match(delta: float) -> void:
 func _start_new_match() -> void:
 	_team_scores = [0, 0]
 	_time_left = MATCH_TIME
+	if _domination != null:
+		_domination.reset()
 	for id: int in _peers:
 		var entry: Dictionary = _peers[id]
 		entry["kills"] = 0
@@ -541,7 +633,7 @@ func _send_snapshots() -> void:
 		var status := [
 			player.health, player.alive, player.weapon.state.ammo, entry["kills"], entry["deaths"],
 			entry["team"], _team_scores[0], _team_scores[1], _time_left, _intermission_left > 0.0,
-			player.weapon.slot,
+			player.weapon.slot, _domination.state() if _domination != null else [],
 		]
 		_rpc_snapshot.rpc_id(id, _tick, entry["last_seq"], player.capture_state(), status, others)
 
@@ -549,6 +641,9 @@ func _send_snapshots() -> void:
 ## 로컬 대전에서 내 HUD를 갱신한다.
 func _update_local_hud() -> void:
 	var entry: Dictionary = _peers[LOCAL_ID]
+	_own_team = int(entry["team"])
+	if _domination != null:
+		_show_zones(_domination.state())
 	if _local.health < _last_local_health:
 		_local.hud.flash_damage()
 	_last_local_health = _local.health
@@ -635,12 +730,26 @@ func _resolve_shot(origin: Vector3, direction: Vector3, shooter_id: int) -> void
 		target_entry["deaths"] = int(target_entry["deaths"]) + 1
 		shooter_entry["kills"] = int(shooter_entry["kills"]) + 1
 		stats["total_kills"] += 1
-		if _intermission_left <= 0.0:
+		if _intermission_left <= 0.0 and _domination == null:
 			_team_scores[int(shooter_entry["team"])] += 1
+		_announce_kill(shooter_id, best_id, int(shooter_entry["team"]), best_headshot)
+	if str(target_entry["kind"]) == "peer":
+		_rpc_damaged.rpc_id(best_id, shooter.global_position)
+	elif str(target_entry["kind"]) == "local":
+		target.show_damage_from(shooter.global_position)
 	if str(shooter_entry["kind"]) == "peer":
 		_rpc_hit.rpc_id(shooter_id, best_headshot, killed)
 	elif str(shooter_entry["kind"]) == "local":
 		shooter.show_hit(best_headshot, killed)
+
+
+func _announce_kill(killer: int, victim: int, killer_team: int, headshot: bool) -> void:
+	if mode == Mode.LOCAL_MATCH:
+		_show_kill(killer, victim, killer_team, headshot, LOCAL_ID)
+		return
+	for id: int in _peers:
+		if str(_peers[id]["kind"]) == "peer":
+			_rpc_kill.rpc_id(id, killer, victim, killer_team, headshot)
 
 
 ## 기록에서 특정 틱의 [위치, low]를 보간해 구한다. 기록이 없으면 빈 배열.
@@ -757,6 +866,18 @@ func _rpc_hit(headshot: bool, killed: bool) -> void:
 	_local.show_hit(headshot, killed)
 
 
+@rpc("authority", "call_remote", "reliable")
+func _rpc_damaged(from: Vector3) -> void:
+	if mode == Mode.CLIENT and _local != null:
+		_local.show_damage_from(from)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_kill(killer: int, victim: int, killer_team: int, headshot: bool) -> void:
+	if mode == Mode.CLIENT:
+		_show_kill(killer, victim, killer_team, headshot, multiplayer.get_unique_id())
+
+
 func _apply_snapshot(
 	tick: int, last_seq: int, own: Array, status: Array, others: Array, delta: float
 ) -> void:
@@ -785,6 +906,8 @@ func _apply_snapshot(
 	if _local == null:
 		return
 	_local.apply_net_status(float(status[0]), bool(status[1]), int(status[2]), int(status[10]))
+	_own_team = int(status[5])
+	_show_zones(status[11])
 	if _local.hud != null:
 		_show_match_hud(
 			int(status[5]), int(status[6]), int(status[7]), float(status[8]),
@@ -841,6 +964,12 @@ func _finish() -> void:
 		var wanted_kills := int(_args["expect-kills"])
 		if int(stats["total_kills"]) < wanted_kills:
 			failures.append("expected %d kills, saw %d" % [wanted_kills, int(stats["total_kills"])])
+	if _args.has("expect-zone-captures"):
+		var wanted_captures := int(_args["expect-zone-captures"])
+		if int(stats["zone_captures"]) < wanted_captures:
+			failures.append(
+				"expected %d zone captures, saw %d" % [wanted_captures, int(stats["zone_captures"])]
+			)
 	if _args.has("max-corrections"):
 		var allowed := int(_args["max-corrections"])
 		if int(stats["corrections"]) > allowed:

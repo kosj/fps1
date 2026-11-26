@@ -12,6 +12,10 @@ const AIM_HEIGHT := 1.0
 const WAYPOINT_RADIUS := 2.0
 const CHASE_TIME := 4.0
 const ERROR_REROLL_TIME := 0.35
+const HOLD_RADIUS := 1.2
+const SCAN_SPEED := 0.9
+## 지키는 지점에서 이보다 멀어지면 싸우는 중에도 돌아간다(m).
+const HOLD_LEASH := 2.5
 
 ## 난이도 조절 값. 사람이 직접 상대해 보며 조정해야 하는 잠정치다.
 var reaction_time := 0.5
@@ -22,6 +26,9 @@ var settle_time := 1.5
 var fire_cone := 0.05
 ## 봇이 드는 무기 슬롯.
 var weapon_slot := 0
+## 지켜야 할 지점(점령 중인 거점). has_hold가 켜져 있으면 교전 중에도 이 근처를 벗어나지 않는다.
+var has_hold := false
+var hold_point := Vector3.ZERO
 
 var _rng := RandomNumberGenerator.new()
 var _yaw := 0.0
@@ -94,6 +101,13 @@ func _fight(cmd: InputCmd, delta: float, eye: Vector3, feet: Vector3, enemies: A
 	elif distance < 6.0:
 		cmd.move.y = 1.0
 
+	if has_hold and _flat_distance(feet, hold_point) > HOLD_LEASH:
+		# 시선은 적에게 둔 채 몸만 지점 쪽으로 옮긴다.
+		var back := Vector2(hold_point.x - feet.x, hold_point.z - feet.z).normalized()
+		var forward := Vector2(-sin(_yaw), -cos(_yaw))
+		var right := Vector2(cos(_yaw), -sin(_yaw))
+		cmd.move = Vector2(back.dot(right), -back.dot(forward))
+
 	cmd.buttons = InputCmd.AIM
 	var off_target := absf(angle_difference(_yaw, wanted_yaw)) + absf(_pitch - wanted_pitch)
 	if _seen_time >= reaction_time and off_target <= fire_cone + _error.length():
@@ -109,10 +123,18 @@ func _roam(cmd: InputCmd, delta: float, feet: Vector3, speed: float, nav_points:
 			_chase_left = 0.0
 	else:
 		var arrived := _has_waypoint and _flat_distance(feet, _waypoint) < WAYPOINT_RADIUS
-		if not _has_waypoint or arrived:
+		# 목표 목록이 바뀌어 지금 목적지가 빠졌으면(거점을 빼앗거나 빼앗김) 새로 고른다.
+		if not _has_waypoint or arrived or not nav_points.has(_waypoint):
 			_pick_waypoint(feet, nav_points)
 		destination = _waypoint
 	if not _has_waypoint and _chase_left <= 0.0:
+		return
+
+	# 갈 곳이 지금 서 있는 자리뿐이면(거점 점령 중) 멈춰서 주변을 살핀다.
+	if nav_points.size() == 1 and _flat_distance(feet, destination) < HOLD_RADIUS:
+		_stuck_time = 0.0
+		_yaw = wrapf(_yaw + SCAN_SPEED * delta, -PI, PI)
+		_pitch = move_toward(_pitch, 0.0, delta)
 		return
 
 	var to_destination := destination - feet
@@ -138,7 +160,7 @@ func _pick_waypoint(feet: Vector3, nav_points: Array) -> void:
 	_has_waypoint = not nav_points.is_empty()
 	if not _has_waypoint:
 		return
-	# 지금 있는 곳과 다른 지점을 고른다.
+	# 지금 있는 곳과 다른 지점을 고른다. 후보가 하나뿐이면 그곳으로 간다.
 	for attempt in 4:
 		_waypoint = nav_points[_rng.randi_range(0, nav_points.size() - 1)]
 		if _flat_distance(feet, _waypoint) > WAYPOINT_RADIUS * 2.0:

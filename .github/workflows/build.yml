@@ -10,6 +10,12 @@ env:
   GODOT_VERSION: "4.7"
   GODOT_RELEASE: "stable"
 
+# run 단계의 기본 셸에는 pipefail이 없어서 "godot ... | tee log"가 실패해도 통과로 처리된다.
+# shell: bash를 명시하면 -eo pipefail로 실행된다.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -80,6 +86,12 @@ jobs:
           ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --exit-after=60 \
             --expect-kills=3 2>&1 | tee botmatch.log
           ! grep -q "SCRIPT ERROR" botmatch.log
+
+      - name: Run domination bot match (bots must capture zones)
+        run: |
+          ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --mode=dom \
+            --exit-after=60 --expect-zone-captures=2 2>&1 | tee dom.log
+          ! grep -q "SCRIPT ERROR" dom.log
 
       - name: Run network test (server + 2 bot clients, 50 ms delay each way)
         run: GODOT=~/godot/godot tests/net/run_net_test.sh lagcomp

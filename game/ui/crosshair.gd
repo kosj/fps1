@@ -12,6 +12,9 @@ var spread_deg := 2.0
 var aim_blend := 0.0
 var fov := 80.0
 
+## 피격 방향 표시. 각 항목은 [화면 기준 각도(라디안, 0이 정면, 시계 방향), 불투명도].
+var damage_marks: Array = []
+
 var _hit_left := 0.0
 var _hit_color := HIT_COLOR
 
@@ -41,6 +44,10 @@ func _draw() -> void:
 			var start := center + direction * gap
 			draw_line(start, start + direction * LINE_LENGTH, color, LINE_WIDTH)
 		draw_circle(center, 1.5, color)
+	for mark: Array in damage_marks:
+		var middle := float(mark[0]) - PI / 2.0
+		var mark_color := Color(1.0, 0.15, 0.1, 0.85 * float(mark[1]))
+		draw_arc(center, 120.0, middle - 0.3, middle + 0.3, 12, mark_color, 7.0)
 	if _hit_left > 0.0:
 		var hit_alpha := _hit_left / HIT_TIME
 		var color := Color(_hit_color.r, _hit_color.g, _hit_color.b, hit_alpha)
