@@ -13,11 +13,11 @@ const WAYPOINT_RADIUS := 2.0
 const CHASE_TIME := 4.0
 const ERROR_REROLL_TIME := 0.35
 
-## 난이도 조절 값.
-var reaction_time := 0.4
+## 난이도 조절 값. 사람이 직접 상대해 보며 조정해야 하는 잠정치다.
+var reaction_time := 0.5
 var turn_speed := 4.5
-var aim_error_start := 0.09
-var aim_error_min := 0.02
+var aim_error_start := 0.11
+var aim_error_min := 0.03
 var settle_time := 1.5
 var fire_cone := 0.05
 
