@@ -9,6 +9,7 @@ const AIM := 16
 const RELOAD := 32
 const ALL_BUTTONS := 63
 const PITCH_LIMIT := 1.55
+const MAX_WEAPON_SLOT := 3
 
 var seq := 0
 ## x: 좌우, y: 전후(전진이 -1).
@@ -18,6 +19,8 @@ var pitch := 0.0
 var buttons := 0
 ## 이 입력을 만들 때 클라이언트가 다른 플레이어를 그리던 서버 틱. 지연 보상에 쓴다.
 var view_tick := 0.0
+## 들고 있으려는 무기 슬롯(0부터).
+var weapon := 0
 
 
 func has(flag: int) -> bool:
@@ -25,16 +28,17 @@ func has(flag: int) -> bool:
 
 
 func to_array() -> Array:
-	return [seq, move, yaw, pitch, buttons, view_tick]
+	return [seq, move, yaw, pitch, buttons, view_tick, weapon]
 
 
 ## 네트워크로 받은 배열을 검증해 입력으로 바꾼다. 형식이 틀리면 null.
 ## 클라이언트는 신뢰할 수 없으므로 범위를 벗어난 값은 잘라 낸다.
 static func from_array(data: Array) -> RefCounted:
-	if data.size() != 6:
+	if data.size() != 7:
 		return null
-	if typeof(data[0]) != TYPE_INT or typeof(data[4]) != TYPE_INT:
-		return null
+	for index: int in [0, 4, 6]:
+		if typeof(data[index]) != TYPE_INT:
+			return null
 	if typeof(data[1]) != TYPE_VECTOR2:
 		return null
 	for index: int in [2, 3, 5]:
@@ -53,4 +57,5 @@ static func from_array(data: Array) -> RefCounted:
 	cmd.pitch = clampf(float(data[3]), -PITCH_LIMIT, PITCH_LIMIT)
 	cmd.buttons = int(data[4]) & ALL_BUTTONS
 	cmd.view_tick = float(data[5])
+	cmd.weapon = clampi(int(data[6]), 0, MAX_WEAPON_SLOT)
 	return cmd

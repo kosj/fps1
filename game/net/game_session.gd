@@ -231,7 +231,10 @@ func _add_bots(count: int) -> void:
 	for index in count:
 		var id := 1000 + index
 		var entry := _add_participant(id, "bot")
-		entry["bot"] = CombatBot.new(id * 7919, entry["player"].rotation.y)
+		var bot := CombatBot.new(id * 7919, entry["player"].rotation.y)
+		# 봇은 소총, 기관단총, 산탄총을 번갈아 든다. 저격총은 봇의 조준 방식과 맞지 않아 뺀다.
+		bot.weapon_slot = index % 3
+		entry["bot"] = bot
 
 
 ## 참가자를 만들어 인원이 적은 팀에 넣는다.
@@ -458,6 +461,7 @@ func _send_snapshots() -> void:
 		var status := [
 			player.health, player.alive, player.weapon.state.ammo, entry["kills"], entry["deaths"],
 			entry["team"], _team_scores[0], _team_scores[1], _time_left, _intermission_left > 0.0,
+			player.weapon.slot,
 		]
 		_rpc_snapshot.rpc_id(id, _tick, entry["last_seq"], player.capture_state(), status, others)
 
@@ -700,7 +704,7 @@ func _apply_snapshot(
 
 	if _local == null:
 		return
-	_local.apply_net_status(float(status[0]), bool(status[1]), int(status[2]))
+	_local.apply_net_status(float(status[0]), bool(status[1]), int(status[2]), int(status[10]))
 	if _local.hud != null:
 		_show_match_hud(
 			int(status[5]), int(status[6]), int(status[7]), float(status[8]),

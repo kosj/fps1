@@ -14,6 +14,8 @@ var _health_label: Label
 var _score_label: Label
 var _damage_overlay: ColorRect
 var _message_label: Label
+var _notice_label: Label
+var _notice_left := 0.0
 
 
 func _ready() -> void:
@@ -46,13 +48,16 @@ func _ready() -> void:
 	_message_label = _make_label(root, 44, Control.PRESET_CENTER)
 	_message_label.offset_top = -200
 	_message_label.offset_bottom = -150
+	_notice_label = _make_label(root, 20, Control.PRESET_CENTER)
+	_notice_label.offset_top = 110
+	_notice_label.offset_bottom = 140
 	_status_label = _make_label(root, 20, Control.PRESET_CENTER)
 	_status_label.offset_top = 60
 	_status_label.offset_bottom = 90
 	_hint_label = _make_label(root, 22, Control.PRESET_CENTER)
 	_hint_label.offset_top = -120
 	_hint_label.offset_bottom = -90
-	_hint_label.text = "Click to play  |  WASD, Shift sprint, Ctrl crouch/slide, Space jump/mantle"
+	_hint_label.text = "Click to play | WASD  Shift  Ctrl  Space  1-4 weapons  -/= sensitivity"
 
 
 func set_ammo(ammo: int, magazine_size: int) -> void:
@@ -81,8 +86,16 @@ func flash_damage() -> void:
 	_damage_overlay.color.a = 0.35
 
 
+## 설정 변경 같은 짧은 알림을 2초간 보여 준다.
+func show_notice(text: String) -> void:
+	_notice_label.text = text
+	_notice_left = 2.0
+
+
 func _process(delta: float) -> void:
 	_damage_overlay.color.a = maxf(_damage_overlay.color.a - delta * 0.9, 0.0)
+	_notice_left = maxf(_notice_left - delta, 0.0)
+	_notice_label.visible = _notice_left > 0.0
 
 
 func set_weapon_name(weapon_name: String) -> void:

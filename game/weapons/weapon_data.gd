@@ -4,6 +4,11 @@ extends Resource
 @export var display_name := "Rifle"
 @export var automatic := true
 
+## 한 번 쏠 때 나가는 탄 수. 산탄총은 여러 발이다.
+@export var pellets := 1
+## 산탄이 조준점 주위로 퍼지는 각도. 정조준해도 줄지 않는다.
+@export var pellet_spread_deg := 0.0
+
 @export_group("Damage")
 @export var damage := 28.0
 @export var min_damage := 18.0

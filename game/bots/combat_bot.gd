@@ -20,6 +20,8 @@ var aim_error_start := 0.11
 var aim_error_min := 0.03
 var settle_time := 1.5
 var fire_cone := 0.05
+## 봇이 드는 무기 슬롯.
+var weapon_slot := 0
 
 var _rng := RandomNumberGenerator.new()
 var _yaw := 0.0
@@ -55,6 +57,7 @@ func make_cmd(
 		_fight(cmd, delta, eye, feet, enemies)
 	cmd.yaw = _yaw
 	cmd.pitch = _pitch
+	cmd.weapon = weapon_slot
 	return cmd
 
 

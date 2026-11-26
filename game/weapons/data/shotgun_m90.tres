@@ -1,0 +1,28 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/weapons/weapon_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "M90 Breacher"
+automatic = false
+pellets = 8
+pellet_spread_deg = 3.5
+damage = 14.0
+min_damage = 3.0
+headshot_multiplier = 1.2
+falloff_start = 6.0
+falloff_end = 18.0
+max_range = 60.0
+fire_interval = 0.75
+magazine_size = 6
+reload_time = 2.6
+ads_time = 0.22
+ads_fov = 65.0
+hip_spread_deg = 0.5
+ads_spread_deg = 0.2
+move_spread_deg = 0.5
+recoil_pattern = PackedVector2Array(0.3, 3.2)
+recoil_recovery = 7.0
+recoil_reset_time = 0.5
+ads_recoil_scale = 0.9
