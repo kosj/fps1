@@ -22,7 +22,10 @@ const LOADOUT := [
 	preload("res://game/weapons/data/shotgun_m90.tres"),
 	preload("res://game/weapons/data/sniper_lr12.tres"),
 ]
-const SETTINGS_PATH := "user://settings.cfg"
+const Settings := preload("res://game/core/settings.gd")
+## 예측 보정으로 생긴 위치 차이를 화면에서 풀어 주는 속도와, 보간하지 않고 바로 옮기는 거리.
+const CORRECTION_SMOOTHING := 12.0
+const CORRECTION_SNAP_DISTANCE := 2.0
 const BASE_SENSITIVITY := 0.002
 const ADS_SENSITIVITY_SCALE := 0.6
 const PITCH_LIMIT := 1.55
@@ -67,6 +70,7 @@ var _mantle_progress := 0.0
 var _prev_buttons := 0
 var _suppress_fire := false
 var _selected_slot := 0
+var _visual_offset := Vector3.ZERO
 var _step_distance := 0.0
 var _shape: CapsuleShape3D
 var _sounds := {}
@@ -100,7 +104,7 @@ func _ready() -> void:
 	weapon.setup(self, LOADOUT)
 	if is_local:
 		hud.set_health(health, MAX_HEALTH)
-		_load_settings()
+		sensitivity_scale = Settings.sensitivity()
 
 
 ## 입력을 받아도 되는 상태인지. 브라우저에서는 클릭으로 포인터를 잠근 뒤부터 조작한다.
@@ -245,6 +249,19 @@ func apply_net_status(new_health: float, new_alive: bool, ammo: int, server_slot
 		weapon.ammo_changed.emit(ammo, weapon.data.magazine_size)
 
 
+func set_sensitivity(value: float) -> void:
+	sensitivity_scale = clampf(value, Settings.MIN_SENSITIVITY, Settings.MAX_SENSITIVITY)
+
+
+## 예측 보정으로 몸이 순간 이동했을 때 부른다. 카메라만 원래 자리에서 새 자리로 부드럽게 따라간다.
+## 판정에 쓰는 실제 위치는 바로 바뀌고 화면만 늦게 따라오므로 결과에는 영향이 없다.
+func add_visual_offset(world_offset: Vector3) -> void:
+	if not is_local or world_offset.length() > CORRECTION_SNAP_DISTANCE:
+		_visual_offset = Vector3.ZERO
+		return
+	_visual_offset += world_offset
+
+
 func show_hit(headshot: bool, killed: bool) -> void:
 	if not is_local:
 		return
@@ -268,9 +285,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	elif event.is_action_pressed("sens_down"):
-		_set_sensitivity(sensitivity_scale / 1.1)
+		_nudge_sensitivity(1.0 / 1.1)
 	elif event.is_action_pressed("sens_up"):
-		_set_sensitivity(sensitivity_scale * 1.1)
+		_nudge_sensitivity(1.1)
 	elif event is InputEventMouseButton and event.is_pressed() and captured:
 		# 마우스 휠로 다음/이전 무기.
 		var button := (event as InputEventMouseButton).button_index
@@ -307,8 +324,11 @@ func _process(delta: float) -> void:
 		target_fov += SPRINT_FOV_BONUS
 	_camera.fov = lerpf(_camera.fov, target_fov, clampf(delta * 14.0, 0.0, 1.0))
 
+	_visual_offset = _visual_offset.lerp(Vector3.ZERO, clampf(delta * CORRECTION_SMOOTHING, 0.0, 1.0))
+	_camera.position = _head.global_transform.basis.inverse() * _visual_offset
+
 	hud.set_crosshair(weapon.current_spread_deg(), aim, _camera.fov)
-	hud.set_hint_visible(not input_active())
+	hud.set_hint_visible(false)
 
 
 func _tick_normal(cmd: InputCmd, pressed: int, delta: float) -> void:
@@ -499,18 +519,10 @@ func _on_weapon_changed(data: Resource) -> void:
 	view_model.play_reload(WeaponController.SWITCH_TIME)
 
 
-func _set_sensitivity(value: float) -> void:
-	sensitivity_scale = clampf(value, 0.2, 5.0)
+func _nudge_sensitivity(factor: float) -> void:
+	set_sensitivity(sensitivity_scale * factor)
+	Settings.write(Settings.SENSITIVITY, sensitivity_scale)
 	hud.show_notice("SENSITIVITY %.2f" % sensitivity_scale)
-	var config := ConfigFile.new()
-	config.set_value("input", "sensitivity_scale", sensitivity_scale)
-	config.save(SETTINGS_PATH)
-
-
-func _load_settings() -> void:
-	var config := ConfigFile.new()
-	if config.load(SETTINGS_PATH) == OK:
-		sensitivity_scale = clampf(config.get_value("input", "sensitivity_scale", 1.0), 0.2, 5.0)
 
 
 func _on_reload_started(duration: float) -> void:

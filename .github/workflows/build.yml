@@ -70,6 +70,11 @@ jobs:
           ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn 2>&1 | tee smoke.log
           ! grep -q "SCRIPT ERROR" smoke.log
 
+      - name: Run menu smoke test
+        run: |
+          ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/menu_smoke.tscn 2>&1 | tee menu.log
+          ! grep -q "SCRIPT ERROR" menu.log
+
       - name: Run bot match (6 bots play team deathmatch for 60 simulated seconds)
         run: |
           ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --exit-after=60 \

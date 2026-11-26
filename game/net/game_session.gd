@@ -30,6 +30,10 @@ const WeaponState := preload("res://game/weapons/weapon_state.gd")
 const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
+const MainMenu := preload("res://game/ui/main_menu.gd")
+const PauseMenu := preload("res://game/ui/pause_menu.gd")
+## 이 인자가 하나라도 있으면 메뉴 없이 바로 시작한다(서버, 자동 테스트, 웹 주소창 접속).
+const DIRECT_START_ARGS := ["server", "connect", "range", "spectate", "bots", "bot", "exit-after"]
 const PLAYER_SCENE := preload("res://game/player/player.tscn")
 const DEFAULT_MAP := "res://maps/graybox/graybox.tscn"
 const HISTORY_SIZE := 64
@@ -62,6 +66,9 @@ var stats := {
 }
 
 var _args := {}
+var _started := false
+var _menu: MainMenu
+var _pause: PauseMenu
 var _map: Node
 var _tick := 0
 var _elapsed := 0.0
@@ -105,6 +112,39 @@ func _ready() -> void:
 
 	_nav_points = _map.call("nav_points")
 
+	var direct := OS.has_feature("dedicated_server")
+	for key: String in DIRECT_START_ARGS:
+		direct = direct or _args.has(key)
+	if direct:
+		_start_from_args()
+	else:
+		_menu = MainMenu.new()
+		_menu.start_requested.connect(_on_start_requested)
+		add_child(_menu)
+
+
+func is_started() -> bool:
+	return _started
+
+
+func local_player():
+	return _local
+
+
+func participant_count() -> int:
+	return _peers.size()
+
+
+func menu() -> MainMenu:
+	return _menu
+
+
+func pause_menu() -> PauseMenu:
+	return _pause
+
+
+func _start_from_args() -> void:
+	_started = true
 	if _args.has("server") or OS.has_feature("dedicated_server"):
 		_start_server(int(_args.get("port", str(Protocol.DEFAULT_PORT))))
 		_add_bots(int(_args.get("bots", "0")))
@@ -122,7 +162,44 @@ func _ready() -> void:
 		_add_bots(int(_args.get("bots", "5")))
 
 
+func _on_start_requested(kind: String, options: Dictionary) -> void:
+	_menu.queue_free()
+	_menu = null
+	_started = true
+	match kind:
+		"join":
+			_start_client(str(options["address"]))
+		"range":
+			mode = Mode.RANGE
+			if _map.has_method("spawn_offline_targets"):
+				_map.call("spawn_offline_targets")
+			_local = _spawn_player(true, 0)
+		_:
+			mode = Mode.LOCAL_MATCH
+			_local = _add_participant(LOCAL_ID, "local")["player"]
+			_add_bots(int(options.get("bots", 5)))
+	_pause = PauseMenu.new()
+	_pause.visible = false
+	_pause.resume_requested.connect(func() -> void: Input.mouse_mode = Input.MOUSE_MODE_CAPTURED)
+	_pause.menu_requested.connect(_return_to_menu)
+	_pause.sensitivity_changed.connect(_on_sensitivity_changed)
+	add_child(_pause)
+
+
+func _on_sensitivity_changed(value: float) -> void:
+	if _local != null:
+		_local.set_sensitivity(value)
+
+
+func _return_to_menu() -> void:
+	multiplayer.multiplayer_peer = null
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	get_tree().reload_current_scene()
+
+
 func _physics_process(delta: float) -> void:
+	if not _started:
+		return
 	_tick += 1
 	_elapsed += delta
 	match mode:
@@ -138,7 +215,10 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(_delta: float) -> void:
-	if mode != Mode.CLIENT:
+	if _pause != null:
+		# 접속이 끝나기 전(_local 없음)에도 메뉴로 돌아갈 수 있게 보여 준다.
+		_pause.visible = _local == null or not _local.input_active()
+	if not _started or mode != Mode.CLIENT:
 		return
 	var render_tick := _render_tick + Engine.get_physics_interpolation_fraction()
 	for id: int in _avatars:
@@ -731,10 +811,12 @@ func _reconcile(last_seq: int, own: Array, delta: float) -> void:
 	if error <= Protocol.RECONCILE_TOLERANCE and int(predicted[2]) == int(own[2]):
 		return
 	stats["corrections"] += 1
+	var before: Vector3 = _local.global_position
 	_local.restore_state(own)
 	for index in range(1, _pending.size()):
 		_local.simulate(_pending[index][1], delta, true)
 		_pending[index][2] = _local.capture_state()
+	_local.add_visual_offset(before - _local.global_position)
 
 
 # ---------------------------------------------------------------- 종료와 검증
