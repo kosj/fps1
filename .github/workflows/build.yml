@@ -13,6 +13,8 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -88,6 +90,24 @@ jobs:
           mkdir -p build/web
           ~/godot/godot --headless --export-release "Web" build/web/index.html
           test -s build/web/index.html
+
+      # main에 병합될 때마다 웹 빌드를 gh-pages 브랜치에 올린다. GitHub Pages가 이 브랜치를 서비스한다.
+      # 빌드 파일로 저장소가 커지지 않도록 매번 커밋 하나로 덮어쓴다.
+      - name: Publish web build to the gh-pages branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/site && cp -r build/web /tmp/site
+          cd /tmp/site
+          touch .nojekyll
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Web build ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
 
       - name: Export Linux dedicated server
         run: |
