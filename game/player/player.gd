@@ -26,6 +26,7 @@ const Settings := preload("res://game/core/settings.gd")
 ## 예측 보정으로 생긴 위치 차이를 화면에서 풀어 주는 속도와, 보간하지 않고 바로 옮기는 거리.
 const CORRECTION_SMOOTHING := 12.0
 const CORRECTION_SNAP_DISTANCE := 2.0
+const DAMAGE_MARK_TIME := 1.5
 const BASE_SENSITIVITY := 0.002
 const ADS_SENSITIVITY_SCALE := 0.6
 const PITCH_LIMIT := 1.55
@@ -71,6 +72,8 @@ var _prev_buttons := 0
 var _suppress_fire := false
 var _selected_slot := 0
 var _visual_offset := Vector3.ZERO
+## 최근에 나를 맞힌 위치들. 각 항목은 [위치, 남은 표시 시간].
+var _damage_sources: Array = []
 var _step_distance := 0.0
 var _shape: CapsuleShape3D
 var _sounds := {}
@@ -262,6 +265,15 @@ func add_visual_offset(world_offset: Vector3) -> void:
 	_visual_offset += world_offset
 
 
+## 맞은 방향을 화면에 표시한다. from은 쏜 사람의 위치.
+func show_damage_from(from: Vector3) -> void:
+	if not is_local:
+		return
+	_damage_sources.append([from, DAMAGE_MARK_TIME])
+	if _damage_sources.size() > 6:
+		_damage_sources.pop_front()
+
+
 func show_hit(headshot: bool, killed: bool) -> void:
 	if not is_local:
 		return
@@ -326,6 +338,15 @@ func _process(delta: float) -> void:
 
 	_visual_offset = _visual_offset.lerp(Vector3.ZERO, clampf(delta * CORRECTION_SMOOTHING, 0.0, 1.0))
 	_camera.position = _head.global_transform.basis.inverse() * _visual_offset
+
+	var marks: Array = []
+	for source: Array in _damage_sources:
+		source[1] = float(source[1]) - delta
+		var offset: Vector3 = source[0] - global_position
+		# 정면이 0, 오른쪽이 +인 화면 기준 각도.
+		marks.append([atan2(offset.x, -offset.z) + rotation.y, float(source[1]) / DAMAGE_MARK_TIME])
+	_damage_sources = _damage_sources.filter(func(item: Array) -> bool: return float(item[1]) > 0.0)
+	hud.set_damage_marks(marks)
 
 	hud.set_crosshair(weapon.current_spread_deg(), aim, _camera.fov)
 	hud.set_hint_visible(false)

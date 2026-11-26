@@ -4,6 +4,8 @@ extends CanvasLayer
 
 const Crosshair := preload("res://game/ui/crosshair.gd")
 const MARGIN := 32
+const FEED_TIME := 5.0
+const FEED_LINES := 5
 
 var _crosshair: Crosshair
 var _ammo_label: Label
@@ -15,6 +17,8 @@ var _score_label: Label
 var _damage_overlay: ColorRect
 var _message_label: Label
 var _notice_label: Label
+var _zone_row: HBoxContainer
+var _feed: VBoxContainer
 var _notice_left := 0.0
 
 
@@ -48,6 +52,20 @@ func _ready() -> void:
 	_message_label = _make_label(root, 44, Control.PRESET_CENTER)
 	_message_label.offset_top = -200
 	_message_label.offset_bottom = -150
+	_zone_row = HBoxContainer.new()
+	_zone_row.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_zone_row.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_zone_row.offset_top = MARGIN + 34
+	_zone_row.add_theme_constant_override("separation", 28)
+	_zone_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_zone_row)
+	_feed = VBoxContainer.new()
+	_feed.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_feed.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_feed.offset_top = MARGIN
+	_feed.offset_right = -MARGIN
+	_feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_feed)
 	_notice_label = _make_label(root, 20, Control.PRESET_CENTER)
 	_notice_label.offset_top = 110
 	_notice_label.offset_bottom = 140
@@ -86,6 +104,39 @@ func flash_damage() -> void:
 	_damage_overlay.color.a = 0.35
 
 
+## 점령전 거점 상태. 각 항목은 [표시할 글자, 색].
+func set_zones(items: Array) -> void:
+	while _zone_row.get_child_count() < items.size():
+		var label := Label.new()
+		label.add_theme_font_size_override("font_size", 26)
+		label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.8))
+		label.add_theme_constant_override("outline_size", 4)
+		_zone_row.add_child(label)
+	for index in items.size():
+		var label: Label = _zone_row.get_child(index)
+		label.text = str(items[index][0])
+		label.modulate = items[index][1]
+
+
+## 킬 로그 한 줄을 추가한다. 5초 뒤 사라지고 최대 5줄까지 보인다.
+func add_feed_line(text: String, color: Color) -> void:
+	var label := Label.new()
+	label.text = text
+	label.modulate = color
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.8))
+	label.add_theme_constant_override("outline_size", 4)
+	label.set_meta("left", FEED_TIME)
+	_feed.add_child(label)
+	if _feed.get_child_count() > FEED_LINES:
+		_feed.get_child(0).queue_free()
+
+
+func set_damage_marks(marks: Array) -> void:
+	_crosshair.damage_marks = marks
+
+
 ## 설정 변경 같은 짧은 알림을 2초간 보여 준다.
 func show_notice(text: String) -> void:
 	_notice_label.text = text
@@ -96,6 +147,12 @@ func _process(delta: float) -> void:
 	_damage_overlay.color.a = maxf(_damage_overlay.color.a - delta * 0.9, 0.0)
 	_notice_left = maxf(_notice_left - delta, 0.0)
 	_notice_label.visible = _notice_left > 0.0
+	for line: Node in _feed.get_children():
+		var left: float = float(line.get_meta("left")) - delta
+		line.set_meta("left", left)
+		(line as Label).modulate.a = clampf(left, 0.0, 1.0)
+		if left <= 0.0:
+			line.queue_free()
 
 
 func set_weapon_name(weapon_name: String) -> void:

@@ -81,6 +81,12 @@ jobs:
             --expect-kills=3 2>&1 | tee botmatch.log
           ! grep -q "SCRIPT ERROR" botmatch.log
 
+      - name: Run domination bot match (bots must capture zones)
+        run: |
+          ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --mode=dom \
+            --exit-after=60 --expect-zone-captures=2 2>&1 | tee dom.log
+          ! grep -q "SCRIPT ERROR" dom.log
+
       - name: Run network test (server + 2 bot clients, 50 ms delay each way)
         run: GODOT=~/godot/godot tests/net/run_net_test.sh lagcomp
 

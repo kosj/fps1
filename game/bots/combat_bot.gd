@@ -12,6 +12,8 @@ const AIM_HEIGHT := 1.0
 const WAYPOINT_RADIUS := 2.0
 const CHASE_TIME := 4.0
 const ERROR_REROLL_TIME := 0.35
+const HOLD_RADIUS := 1.2
+const SCAN_SPEED := 0.9
 
 ## 난이도 조절 값. 사람이 직접 상대해 보며 조정해야 하는 잠정치다.
 var reaction_time := 0.5
@@ -109,10 +111,18 @@ func _roam(cmd: InputCmd, delta: float, feet: Vector3, speed: float, nav_points:
 			_chase_left = 0.0
 	else:
 		var arrived := _has_waypoint and _flat_distance(feet, _waypoint) < WAYPOINT_RADIUS
-		if not _has_waypoint or arrived:
+		# 목표 목록이 바뀌어 지금 목적지가 빠졌으면(거점을 빼앗거나 빼앗김) 새로 고른다.
+		if not _has_waypoint or arrived or not nav_points.has(_waypoint):
 			_pick_waypoint(feet, nav_points)
 		destination = _waypoint
 	if not _has_waypoint and _chase_left <= 0.0:
+		return
+
+	# 갈 곳이 지금 서 있는 자리뿐이면(거점 점령 중) 멈춰서 주변을 살핀다.
+	if nav_points.size() == 1 and _flat_distance(feet, destination) < HOLD_RADIUS:
+		_stuck_time = 0.0
+		_yaw = wrapf(_yaw + SCAN_SPEED * delta, -PI, PI)
+		_pitch = move_toward(_pitch, 0.0, delta)
 		return
 
 	var to_destination := destination - feet
@@ -138,7 +148,7 @@ func _pick_waypoint(feet: Vector3, nav_points: Array) -> void:
 	_has_waypoint = not nav_points.is_empty()
 	if not _has_waypoint:
 		return
-	# 지금 있는 곳과 다른 지점을 고른다.
+	# 지금 있는 곳과 다른 지점을 고른다. 후보가 하나뿐이면 그곳으로 간다.
 	for attempt in 4:
 		_waypoint = nav_points[_rng.randi_range(0, nav_points.size() - 1)]
 		if _flat_distance(feet, _waypoint) > WAYPOINT_RADIUS * 2.0:

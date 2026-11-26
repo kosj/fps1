@@ -13,6 +13,7 @@ var range_button: Button
 var join_button: Button
 var address_edit: LineEdit
 var bot_count: SpinBox
+var mode_select: OptionButton
 
 
 func _ready() -> void:
@@ -35,6 +36,11 @@ func _ready() -> void:
 	bot_count.max_value = 11
 	bot_count.value = int(Settings.read(Settings.BOT_COUNT, 5))
 	bots_row.add_child(bot_count)
+	mode_select = OptionButton.new()
+	mode_select.add_item("Team deathmatch")
+	mode_select.add_item("Domination")
+	mode_select.selected = 1 if str(Settings.read(Settings.GAME_MODE, "tdm")) == "dom" else 0
+	bots_row.add_child(mode_select)
 	column.add_child(bots_row)
 
 	range_button = MenuKit.button("SHOOTING RANGE")
@@ -61,8 +67,10 @@ func _ready() -> void:
 
 func _on_play() -> void:
 	var bots := int(bot_count.value)
+	var game_mode := "dom" if mode_select.selected == 1 else "tdm"
 	Settings.write(Settings.BOT_COUNT, bots)
-	start_requested.emit("bots", {"bots": bots})
+	Settings.write(Settings.GAME_MODE, game_mode)
+	start_requested.emit("bots", {"bots": bots, "mode": game_mode})
 
 
 func _on_join() -> void:
