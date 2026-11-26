@@ -8,6 +8,7 @@ const SPAWNS := [
 	[Vector3(10.0, 0.1, -10.0), 90.0],
 	[Vector3(-10.0, 0.1, -10.0), -90.0],
 ]
+const EXTRA_NAV_POINTS := [Vector3(0.0, 0.0, -10.0)]
 
 
 func _ready() -> void:
@@ -19,6 +20,19 @@ func _ready() -> void:
 	collision.shape = shape
 	body.add_child(collision)
 	add_child(body)
+
+
+func spawn_count() -> int:
+	return SPAWNS.size()
+
+
+## 봇이 돌아다닐 지점.
+func nav_points() -> Array:
+	var points: Array = []
+	for spawn: Array in SPAWNS:
+		points.append(spawn[0])
+	points.append_array(EXTRA_NAV_POINTS)
+	return points
 
 
 func spawn_point(index: int) -> Transform3D:
