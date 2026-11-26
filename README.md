@@ -71,6 +71,12 @@ GODOT=godot tests/net/run_net_test.sh prediction
 
 웹 빌드는 HTTPS 또는 localhost에서 열어야 합니다.
 
+### 웹 배포
+
+`main`에 병합될 때마다 웹 빌드가 `gh-pages` 브랜치에 올라갑니다.
+저장소 Settings → Pages에서 Source를 "Deploy from a branch", 브랜치를 `gh-pages`로 지정하면 GitHub Pages 주소로 서비스됩니다.
+게임 서버가 아직 배포되지 않았으므로 웹에서는 오프라인 사격장만 됩니다. 대전을 하려면 `?connect=wss://서버주소`가 가리킬 TLS 게임 서버가 필요합니다.
+
 ## 폴더 구조
 
 ```
