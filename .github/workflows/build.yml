@@ -55,10 +55,18 @@ jobs:
       - name: Import project
         run: |
           chmod +x ~/godot/godot
-          ~/godot/godot --headless --import
+          ~/godot/godot --headless --import 2>&1 | tee import.log
+          ! grep -q "SCRIPT ERROR" import.log
 
       - name: Run unit tests
-        run: ~/godot/godot --headless --script res://tests/run_tests.gd
+        run: |
+          ~/godot/godot --headless --script res://tests/run_tests.gd 2>&1 | tee unit.log
+          ! grep -q "SCRIPT ERROR" unit.log
+
+      - name: Run gameplay smoke test
+        run: |
+          ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn 2>&1 | tee smoke.log
+          ! grep -q "SCRIPT ERROR" smoke.log
 
       - name: Export Windows
         run: |

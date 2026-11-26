@@ -1,0 +1,82 @@
+extends CanvasLayer
+## 전투 HUD: 조준선, 히트마커, 탄약, 무기 이름, 안내 문구.
+## 웹 빌드에는 시스템 글꼴이 없어 한글이 표시되지 않으므로, 한글 글꼴을 넣기 전까지 영문만 쓴다.
+
+const Crosshair := preload("res://game/ui/crosshair.gd")
+const MARGIN := 32
+
+var _crosshair: Crosshair
+var _ammo_label: Label
+var _weapon_label: Label
+var _status_label: Label
+var _hint_label: Label
+
+
+func _ready() -> void:
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(root)
+
+	_crosshair = Crosshair.new()
+	_crosshair.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_crosshair)
+
+	_ammo_label = _make_label(root, 40, Control.PRESET_BOTTOM_RIGHT)
+	_ammo_label.offset_bottom = -MARGIN
+	_weapon_label = _make_label(root, 18, Control.PRESET_BOTTOM_RIGHT)
+	_weapon_label.offset_bottom = -MARGIN - 52
+	_status_label = _make_label(root, 20, Control.PRESET_CENTER)
+	_status_label.offset_top = 60
+	_status_label.offset_bottom = 90
+	_hint_label = _make_label(root, 22, Control.PRESET_CENTER)
+	_hint_label.offset_top = -120
+	_hint_label.offset_bottom = -90
+	_hint_label.text = "Click to play  |  WASD, Shift sprint, Ctrl crouch/slide, Space jump/mantle"
+
+
+func set_ammo(ammo: int, magazine_size: int) -> void:
+	_ammo_label.text = "%d / %d" % [ammo, magazine_size]
+	var low := ammo <= magazine_size / 5
+	_ammo_label.modulate = Color(1.0, 0.4, 0.3) if low else Color(1.0, 1.0, 1.0)
+
+
+func set_weapon_name(weapon_name: String) -> void:
+	_weapon_label.text = weapon_name
+
+
+func set_reloading(reloading: bool) -> void:
+	_status_label.text = "RELOADING" if reloading else ""
+
+
+func set_hint_visible(shown: bool) -> void:
+	_hint_label.visible = shown
+
+
+func set_crosshair(spread_deg: float, aim_blend: float, fov: float) -> void:
+	_crosshair.spread_deg = spread_deg
+	_crosshair.aim_blend = aim_blend
+	_crosshair.fov = fov
+
+
+func show_hit(headshot: bool, killed: bool) -> void:
+	_crosshair.flash_hit(headshot, killed)
+
+
+func _make_label(parent: Control, font_size: int, preset: Control.LayoutPreset) -> Label:
+	var label := Label.new()
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.8))
+	label.add_theme_constant_override("outline_size", 4)
+	label.set_anchors_preset(preset)
+	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	if preset == Control.PRESET_BOTTOM_RIGHT:
+		label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		label.offset_right = -MARGIN
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	else:
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	parent.add_child(label)
+	return label

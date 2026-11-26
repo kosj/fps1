@@ -5,6 +5,8 @@ extends SceneTree
 
 const SUITES := {
 	"move_math": preload("res://tests/test_move_math.gd"),
+	"weapon_state": preload("res://tests/test_weapon_state.gd"),
+	"core": preload("res://tests/test_core.gd"),
 }
 
 
