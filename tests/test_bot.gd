@@ -87,3 +87,18 @@ func test_same_seed_gives_same_decisions() -> String:
 		if a.to_array() != b.to_array():
 			return "bots with the same seed diverged at tick %d" % tick
 	return ""
+
+
+func test_bot_returns_to_hold_point_while_fighting() -> String:
+	var bot := CombatBot.new(4)
+	bot.has_hold = true
+	bot.hold_point = Vector3(-6.0, 0.0, 0.0)
+	# 적은 정면(-z)에 있고 지킬 지점은 왼쪽(-x)에 있다. 시선은 적을 향한 채 왼쪽으로 움직여야 한다.
+	var cmd: InputCmd
+	for tick in 90:
+		cmd = bot.make_cmd(TICK, EYE, FEET, 0.0, [Vector3(0.0, 0.0, -12.0)], [])
+	if cmd.move.x > -0.8:
+		return "bot should strafe left toward its hold point, move was %s" % cmd.move
+	if absf(cmd.yaw) > 0.3:
+		return "bot should keep facing the enemy, yaw was %f" % cmd.yaw
+	return ""

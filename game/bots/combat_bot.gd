@@ -14,6 +14,8 @@ const CHASE_TIME := 4.0
 const ERROR_REROLL_TIME := 0.35
 const HOLD_RADIUS := 1.2
 const SCAN_SPEED := 0.9
+## 지키는 지점에서 이보다 멀어지면 싸우는 중에도 돌아간다(m).
+const HOLD_LEASH := 2.5
 
 ## 난이도 조절 값. 사람이 직접 상대해 보며 조정해야 하는 잠정치다.
 var reaction_time := 0.5
@@ -24,6 +26,9 @@ var settle_time := 1.5
 var fire_cone := 0.05
 ## 봇이 드는 무기 슬롯.
 var weapon_slot := 0
+## 지켜야 할 지점(점령 중인 거점). has_hold가 켜져 있으면 교전 중에도 이 근처를 벗어나지 않는다.
+var has_hold := false
+var hold_point := Vector3.ZERO
 
 var _rng := RandomNumberGenerator.new()
 var _yaw := 0.0
@@ -95,6 +100,13 @@ func _fight(cmd: InputCmd, delta: float, eye: Vector3, feet: Vector3, enemies: A
 		cmd.move.y = -1.0
 	elif distance < 6.0:
 		cmd.move.y = 1.0
+
+	if has_hold and _flat_distance(feet, hold_point) > HOLD_LEASH:
+		# 시선은 적에게 둔 채 몸만 지점 쪽으로 옮긴다.
+		var back := Vector2(hold_point.x - feet.x, hold_point.z - feet.z).normalized()
+		var forward := Vector2(-sin(_yaw), -cos(_yaw))
+		var right := Vector2(cos(_yaw), -sin(_yaw))
+		cmd.move = Vector2(back.dot(right), -back.dot(forward))
 
 	cmd.buttons = InputCmd.AIM
 	var off_target := absf(angle_difference(_yaw, wanted_yaw)) + absf(_pitch - wanted_pitch)

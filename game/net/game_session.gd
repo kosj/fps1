@@ -553,8 +553,14 @@ func _bot_cmd(id: int, entry: Dictionary, delta: float) -> InputCmd:
 		visible.append(target.global_position)
 	var bot: CombatBot = entry["bot"]
 	var goals := _nav_points
+	bot.has_hold = false
 	if _domination != null:
-		goals = _domination.objectives_for(int(entry["team"]), player.global_position)
+		var team := int(entry["team"])
+		goals = _domination.objectives_for(team, player.global_position)
+		var hold := _domination.hold_zone_for(team, player.global_position)
+		if hold >= 0:
+			bot.has_hold = true
+			bot.hold_point = _domination.centers[hold]
 	return bot.make_cmd(
 		delta, eye, player.global_position, player.horizontal_speed(), visible, goals
 	)

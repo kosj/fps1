@@ -10,6 +10,12 @@ env:
   GODOT_VERSION: "4.7"
   GODOT_RELEASE: "stable"
 
+# run 단계의 기본 셸에는 pipefail이 없어서 "godot ... | tee log"가 실패해도 통과로 처리된다.
+# shell: bash를 명시하면 -eo pipefail로 실행된다.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     runs-on: ubuntu-latest

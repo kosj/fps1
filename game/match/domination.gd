@@ -74,11 +74,19 @@ func state() -> Array:
 	return rows
 
 
+## 이 팀이 지금 서서 지켜야 할 거점 번호(안에 있고 아직 우리 것이 아닌 거점). 없으면 -1.
+func hold_zone_for(team: int, position: Vector3) -> int:
+	var inside := zone_at(position)
+	if inside >= 0 and int(owners[inside]) != team:
+		return inside
+	return -1
+
+
 ## 봇이 향할 곳. 점령 중인 거점 안에 있으면 그 자리를 지키고,
 ## 아니면 아직 우리 팀 것이 아닌 거점들, 모두 우리 것이면 전체 거점을 돌려준다.
 func objectives_for(team: int, position: Vector3) -> Array:
-	var inside := zone_at(position)
-	if inside >= 0 and int(owners[inside]) != team:
+	var inside := hold_zone_for(team, position)
+	if inside >= 0:
 		return [centers[inside]]
 	var wanted: Array = []
 	for index in centers.size():
