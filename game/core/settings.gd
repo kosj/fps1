@@ -6,6 +6,8 @@ const SENSITIVITY := "input/sensitivity_scale"
 const BOT_COUNT := "match/bots"
 const SERVER_ADDRESS := "match/server_address"
 const GAME_MODE := "match/mode"
+const DIFFICULTY := "match/difficulty"
+const LOW_GRAPHICS := "video/low"
 const UI_SCALE := "ui/scale"
 const MIN_UI_SCALE := 0.8
 const MAX_UI_SCALE := 2.0
@@ -50,6 +52,26 @@ static func is_mobile() -> bool:
 static func ui_scale() -> float:
 	var fallback := MOBILE_UI_SCALE if is_mobile() else 1.0
 	return clampf(float(read(UI_SCALE, fallback)), MIN_UI_SCALE, MAX_UI_SCALE)
+
+
+## 봇 난이도. 엄지로 조준하는 휴대폰에서는 쉬움이 기본이다.
+static func difficulty() -> String:
+	return str(read(DIFFICULTY, "easy" if is_mobile() else "normal"))
+
+
+## 그림자와 해상도를 낮춘 저사양 그래픽. 휴대폰에서는 기본으로 켠다.
+static func low_graphics() -> bool:
+	return bool(read(LOW_GRAPHICS, is_mobile()))
+
+
+## 저사양 설정이면 그림자와 안티에일리어싱을 끄고 3D 해상도를 낮춘다(UI 해상도는 그대로).
+static func apply_quality(map: Node, viewport: Viewport) -> void:
+	var low := low_graphics()
+	var sun := map.get_node_or_null("Sun") as DirectionalLight3D
+	if sun != null:
+		sun.shadow_enabled = not low
+	viewport.msaa_3d = Viewport.MSAA_DISABLED if low else Viewport.MSAA_2X
+	viewport.scaling_3d_scale = 0.75 if low else 1.0
 
 
 static func sensitivity() -> float:

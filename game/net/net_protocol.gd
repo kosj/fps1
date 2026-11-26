@@ -17,3 +17,5 @@ const RESPAWN_TIME := 3.0
 const MAX_HEALTH := 100.0
 const FLAG_LOW := 1
 const FLAG_ALIVE := 2
+## 지난 스냅샷 이후 발사했음. 다른 플레이어의 총소리를 내는 데 쓴다.
+const FLAG_FIRED := 4

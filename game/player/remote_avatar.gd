@@ -3,6 +3,7 @@ extends Node3D
 ## 임시 상자 모델이며 M3에서 캐릭터 모델로 교체한다.
 
 const HitMath := preload("res://game/combat/hit_math.gd")
+const SfxSynth := preload("res://game/audio/sfx_synth.gd")
 const MAX_SAMPLES := 40
 
 var alive := true
@@ -13,6 +14,7 @@ var _samples: Array = []
 var _body: MeshInstance3D
 var _head: MeshInstance3D
 var _material := StandardMaterial3D.new()
+var _shot_audio: AudioStreamPlayer3D
 
 
 func _ready() -> void:
@@ -27,6 +29,19 @@ func build() -> void:
 	_body = _add_part(Vector3(0.6, 1.0, 0.35), _material)
 	_head = _add_part(Vector3(0.28, 0.28, 0.28), _material)
 	_apply_height()
+	# 거리와 방향이 들리는 3D 총소리. 적의 위치를 귀로 알 수 있게 한다.
+	_shot_audio = AudioStreamPlayer3D.new()
+	_shot_audio.stream = SfxSynth.gunshot()
+	_shot_audio.unit_size = 14.0
+	_shot_audio.max_distance = 110.0
+	_shot_audio.max_polyphony = 4
+	_shot_audio.position.y = 1.4
+	add_child(_shot_audio)
+
+
+func play_shot() -> void:
+	if _shot_audio != null and _shot_audio.is_inside_tree():
+		_shot_audio.play()
 
 
 func set_color(color: Color) -> void:
