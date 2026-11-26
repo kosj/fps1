@@ -1,0 +1,94 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.7"
+  GODOT_RELEASE: "stable"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Lint GDScript
+        run: |
+          pip install "gdtoolkit>=4,<5"
+          gdlint game maps tests
+
+      - name: Cache Godot editor and export templates
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}
+
+      - name: Download Godot editor and export templates
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          TAG="${GODOT_VERSION}-${GODOT_RELEASE}"
+          BASE="https://github.com/godotengine/godot/releases/download/${TAG}"
+          mkdir -p ~/godot ~/.local/share/godot/export_templates
+          curl -fsSL -o /tmp/godot.zip "${BASE}/Godot_v${TAG}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          mv "/tmp/godot/Godot_v${TAG}_linux.x86_64" ~/godot/godot
+          curl -fsSL -o /tmp/templates.tpz "${BASE}/Godot_v${TAG}_export_templates.tpz"
+          unzip -q /tmp/templates.tpz -d /tmp/templates
+          mv /tmp/templates/templates \
+            ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}
+
+      - name: Import project
+        run: |
+          chmod +x ~/godot/godot
+          ~/godot/godot --headless --import
+
+      - name: Run unit tests
+        run: ~/godot/godot --headless --script res://tests/run_tests.gd
+
+      - name: Export Windows
+        run: |
+          mkdir -p build/windows
+          ~/godot/godot --headless --export-release "Windows Desktop" build/windows/fps1.exe
+          test -s build/windows/fps1.exe
+
+      - name: Export Web
+        run: |
+          mkdir -p build/web
+          ~/godot/godot --headless --export-release "Web" build/web/index.html
+          test -s build/web/index.html
+
+      - name: Export Linux dedicated server
+        run: |
+          mkdir -p build/server
+          ~/godot/godot --headless --export-release "Linux Server" build/server/fps1_server.x86_64
+          test -s build/server/fps1_server.x86_64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fps1-windows
+          path: build/windows
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fps1-web
+          path: build/web
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fps1-linux-server
+          path: build/server

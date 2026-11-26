@@ -1,0 +1,16 @@
+# Godot
+.godot/
+*.translation
+export_credentials.cfg
+
+# 빌드 산출물
+build/
+
+# 에셋 원본 작업 중 임시 파일
+*.blend1
+*.blend2
+tools/audio/raw/
+
+# OS
+.DS_Store
+Thumbs.db
