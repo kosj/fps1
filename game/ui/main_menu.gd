@@ -19,9 +19,8 @@ var mode_select: OptionButton
 func _ready() -> void:
 	layer = 20
 	var column := MenuKit.centered_column(self, Color(0.07, 0.08, 0.1, 1.0))
-	column.add_child(MenuKit.label("FPS1", 64))
-	column.add_child(MenuKit.label("Team deathmatch prototype", 18))
-	column.add_child(_spacer(16.0))
+	column.add_child(MenuKit.label("FPS1", 48))
+	column.add_child(_spacer(6.0))
 
 	play_button = MenuKit.button("PLAY VS BOTS")
 	play_button.pressed.connect(_on_play)
@@ -30,7 +29,7 @@ func _ready() -> void:
 	var bots_row := HBoxContainer.new()
 	bots_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	bots_row.add_theme_constant_override("separation", 12)
-	bots_row.add_child(MenuKit.label("Bots", 16))
+	bots_row.add_child(MenuKit.label("Bots", 18))
 	bot_count = SpinBox.new()
 	bot_count.min_value = 1
 	bot_count.max_value = 11
@@ -46,19 +45,21 @@ func _ready() -> void:
 	range_button = MenuKit.button("SHOOTING RANGE")
 	range_button.pressed.connect(func() -> void: start_requested.emit("range", {}))
 	column.add_child(range_button)
-	column.add_child(_spacer(8.0))
+	column.add_child(_spacer(4.0))
 
 	address_edit = LineEdit.new()
 	address_edit.text = str(Settings.read(Settings.SERVER_ADDRESS, DEFAULT_ADDRESS))
 	address_edit.placeholder_text = "host:port or wss://address"
-	address_edit.custom_minimum_size = Vector2(320.0, 40.0)
+	address_edit.custom_minimum_size = Vector2(320.0, 38.0)
+	address_edit.add_theme_font_size_override("font_size", 18)
 	column.add_child(address_edit)
 	join_button = MenuKit.button("JOIN SERVER")
 	join_button.pressed.connect(_on_join)
 	column.add_child(join_button)
-	column.add_child(_spacer(8.0))
+	column.add_child(_spacer(4.0))
 
 	column.add_child(MenuKit.sensitivity_row(Callable()))
+	column.add_child(MenuKit.ui_scale_row(get_tree()))
 	if not OS.has_feature("web"):
 		var quit_button := MenuKit.button("QUIT")
 		quit_button.pressed.connect(func() -> void: get_tree().quit())

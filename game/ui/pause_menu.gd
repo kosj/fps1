@@ -22,10 +22,10 @@ func _ready() -> void:
 	column.add_child(
 		MenuKit.sensitivity_row(func(value: float) -> void: sensitivity_changed.emit(value))
 	)
-	column.add_child(
-		MenuKit.label("WASD move   Shift sprint   Ctrl crouch / slide   Space jump / mantle", 14)
-	)
-	column.add_child(MenuKit.label("LMB fire   RMB aim   R reload   1-4 or wheel weapons", 14))
+	column.add_child(MenuKit.ui_scale_row(get_tree()))
+	column.add_child(MenuKit.label("WASD move    Shift sprint    Ctrl crouch / slide", 18))
+	column.add_child(MenuKit.label("Space jump / mantle    R reload", 18))
+	column.add_child(MenuKit.label("LMB fire    RMB aim    1-4 or wheel: weapons", 18))
 	menu_button = MenuKit.button("MAIN MENU")
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
 	column.add_child(menu_button)
