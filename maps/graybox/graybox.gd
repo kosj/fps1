@@ -39,6 +39,16 @@ const SPAWNS := [
 	[Vector3(10.0, 0.1, -30.0), 150.0],
 ]
 
+const EXTRA_NAV_POINTS := [
+	Vector3(0.0, 0.0, -8.0),
+	Vector3(6.0, 0.0, -10.0),
+	Vector3(-7.0, 0.0, -14.0),
+	Vector3(3.0, 0.0, -20.0),
+	Vector3(-3.0, 0.0, -26.0),
+	Vector3(12.0, 0.0, -6.0),
+	Vector3(-12.0, 0.0, -28.0),
+]
+
 @onready var _sun: DirectionalLight3D = $Sun
 
 
@@ -55,6 +65,19 @@ func _ready() -> void:
 
 
 ## 세션이 플레이어를 놓을 자리. 인원이 스폰 수보다 많으면 처음부터 다시 쓴다.
+func spawn_count() -> int:
+	return SPAWNS.size()
+
+
+## 봇이 돌아다닐 지점.
+func nav_points() -> Array:
+	var points: Array = []
+	for spawn: Array in SPAWNS:
+		points.append(spawn[0])
+	points.append_array(EXTRA_NAV_POINTS)
+	return points
+
+
 func spawn_point(index: int) -> Transform3D:
 	var spawn: Array = SPAWNS[index % SPAWNS.size()]
 	var facing := Basis.from_euler(Vector3(0.0, deg_to_rad(spawn[1]), 0.0))

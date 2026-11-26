@@ -8,6 +8,7 @@ const SUITES := {
 	"weapon_state": preload("res://tests/test_weapon_state.gd"),
 	"core": preload("res://tests/test_core.gd"),
 	"net": preload("res://tests/test_net.gd"),
+	"bot": preload("res://tests/test_bot.gd"),
 }
 
 

@@ -12,6 +12,7 @@ var low := false
 var _samples: Array = []
 var _body: MeshInstance3D
 var _head: MeshInstance3D
+var _material := StandardMaterial3D.new()
 
 
 func _ready() -> void:
@@ -22,11 +23,23 @@ func _ready() -> void:
 func build() -> void:
 	if _body != null:
 		return
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.75, 0.25, 0.2)
-	_body = _add_part(Vector3(0.6, 1.0, 0.35), material)
-	_head = _add_part(Vector3(0.28, 0.28, 0.28), material)
+	_material.albedo_color = Color(0.75, 0.25, 0.2)
+	_body = _add_part(Vector3(0.6, 1.0, 0.35), _material)
+	_head = _add_part(Vector3(0.28, 0.28, 0.28), _material)
 	_apply_height()
+
+
+func set_color(color: Color) -> void:
+	_material.albedo_color = color
+
+
+## 보간 없이 자세만 바로 반영한다. 같은 프로세스에 있는 플레이어(봇)에 붙여 쓸 때 사용한다.
+func set_pose(is_low: bool, is_alive: bool) -> void:
+	alive = is_alive
+	visible = is_alive
+	if low != is_low:
+		low = is_low
+		_apply_height()
 
 
 func push(tick: int, at: Vector3, yaw: float, is_low: bool, is_alive: bool) -> void:

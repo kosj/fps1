@@ -13,6 +13,7 @@ var _hint_label: Label
 var _health_label: Label
 var _score_label: Label
 var _damage_overlay: ColorRect
+var _message_label: Label
 
 
 func _ready() -> void:
@@ -42,6 +43,9 @@ func _ready() -> void:
 	_score_label = _make_label(root, 20, Control.PRESET_CENTER_TOP)
 	_score_label.offset_top = MARGIN
 	_score_label.offset_bottom = MARGIN + 28
+	_message_label = _make_label(root, 44, Control.PRESET_CENTER)
+	_message_label.offset_top = -200
+	_message_label.offset_bottom = -150
 	_status_label = _make_label(root, 20, Control.PRESET_CENTER)
 	_status_label.offset_top = 60
 	_status_label.offset_bottom = 90
@@ -65,6 +69,11 @@ func set_health(health: float, max_health: float) -> void:
 
 func set_score(text: String) -> void:
 	_score_label.text = text
+
+
+## 화면 가운데의 큰 안내 문구(리스폰 대기, 승패). 빈 문자열이면 숨긴다.
+func set_message(text: String) -> void:
+	_message_label.text = text
 
 
 ## 피격 시 화면 가장자리가 붉게 번쩍인다.

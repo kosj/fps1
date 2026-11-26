@@ -70,6 +70,12 @@ jobs:
           ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn 2>&1 | tee smoke.log
           ! grep -q "SCRIPT ERROR" smoke.log
 
+      - name: Run bot match (6 bots play team deathmatch for 60 simulated seconds)
+        run: |
+          ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --exit-after=60 \
+            --expect-kills=3 2>&1 | tee botmatch.log
+          ! grep -q "SCRIPT ERROR" botmatch.log
+
       - name: Run network test (server + 2 bot clients, 50 ms delay each way)
         run: GODOT=~/godot/godot tests/net/run_net_test.sh lagcomp
 
