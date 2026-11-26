@@ -66,6 +66,13 @@ func start_reload() -> bool:
 	return true
 
 
+## 무기를 바꾸면 진행 중이던 재장전은 취소된다.
+func cancel_reload() -> void:
+	if phase == Phase.RELOADING:
+		phase = Phase.READY
+		reload_left = 0.0
+
+
 ## 원뿔 안에서 고르게 뽑은 편차(라디안). x: 좌우, y: 상하.
 func roll_spread(spread_deg: float) -> Vector2:
 	var radius := deg_to_rad(spread_deg) * sqrt(_rng.randf())

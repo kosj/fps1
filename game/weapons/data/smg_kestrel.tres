@@ -1,0 +1,26 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/weapons/weapon_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+display_name = "Kestrel-9"
+automatic = true
+damage = 25.0
+min_damage = 12.0
+headshot_multiplier = 1.4
+falloff_start = 12.0
+falloff_end = 30.0
+max_range = 150.0
+fire_interval = 0.065
+magazine_size = 32
+reload_time = 1.6
+ads_time = 0.14
+ads_fov = 60.0
+hip_spread_deg = 1.6
+ads_spread_deg = 0.3
+move_spread_deg = 0.8
+recoil_pattern = PackedVector2Array(0, 0.55, 0.08, 0.5, -0.1, 0.48, 0.15, 0.45, 0.2, 0.42, -0.05, 0.4, -0.22, 0.38, -0.25, 0.36, 0.05, 0.35, 0.24, 0.34, 0.2, 0.33, -0.1, 0.32, -0.24, 0.32, 0.1, 0.3)
+recoil_recovery = 11.0
+recoil_reset_time = 0.3
+ads_recoil_scale = 0.8

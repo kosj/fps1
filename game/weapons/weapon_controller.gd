@@ -10,6 +10,7 @@ signal ammo_changed(ammo: int, magazine_size: int)
 signal reload_started(duration: float)
 signal reload_finished
 signal dry_fired
+signal weapon_changed(weapon: WeaponData)
 
 const InputCmd := preload("res://game/player/input_cmd.gd")
 const WeaponData := preload("res://game/weapons/weapon_data.gd")
@@ -18,9 +19,14 @@ const Recoil := preload("res://game/weapons/recoil.gd")
 const WORLD_MASK := 1
 ## 월드(1)와 히트박스(4). 캐릭터 몸체 캡슐(2)은 맞히지 않는다.
 const HIT_MASK := 5
+## 무기를 바꾼 뒤 쏠 수 있게 되기까지의 시간(초).
+const SWITCH_TIME := 0.4
 
+## 지금 들고 있는 무기의 데이터와 상태.
 var data: WeaponData
 var state: WeaponState
+var loadout: Array = []
+var slot := 0
 var recoil := Recoil.new()
 ## 0은 지향 사격, 1은 정조준.
 var aim_blend := 0.0
@@ -32,21 +38,30 @@ var resolve_shot: Callable
 var _player: CharacterBody3D
 var _applied_recoil := Vector2.ZERO
 var _trigger_was_down := false
+var _states: Array = []
+var _switch_left := 0.0
 
 
-func setup(player: CharacterBody3D, weapon: WeaponData) -> void:
+func setup(player: CharacterBody3D, weapons: Array) -> void:
 	_player = player
-	data = weapon
+	loadout = weapons
 	resolve_shot = resolve_offline
 	reset()
 
 
-## 탄창을 채우고 상태를 처음으로 되돌린다(리스폰).
+## 모든 무기의 탄창을 채우고 상태를 처음으로 되돌린다(리스폰). 들고 있던 슬롯은 유지한다.
 func reset() -> void:
-	state = WeaponState.new(data)
+	_states.clear()
+	for index in loadout.size():
+		_states.append(WeaponState.new(loadout[index], index + 1))
 	aim_blend = 0.0
 	_trigger_was_down = false
-	ammo_changed.emit(state.ammo, data.magazine_size)
+	_switch_left = 0.0
+	_select(clampi(slot, 0, loadout.size() - 1))
+
+
+func is_switching() -> bool:
+	return _switch_left > 0.0
 
 
 func current_spread_deg() -> float:
@@ -59,7 +74,14 @@ func current_spread_deg() -> float:
 
 ## 한 틱 진행한다. pressed는 이번 틱에 새로 눌린 버튼 비트.
 func tick(cmd: InputCmd, pressed: int, delta: float) -> void:
-	var can_use: bool = not _player.blocks_weapon()
+	var wanted := clampi(cmd.weapon, 0, loadout.size() - 1)
+	if wanted != slot:
+		state.cancel_reload()
+		_select(wanted)
+		_switch_left = SWITCH_TIME
+		aim_blend = 0.0
+	_switch_left = maxf(_switch_left - delta, 0.0)
+	var can_use: bool = not _player.blocks_weapon() and _switch_left <= 0.0
 	var wants_aim := can_use and cmd.has(InputCmd.AIM)
 	var aim_target := 1.0 if wants_aim else 0.0
 	aim_blend = move_toward(aim_blend, aim_target, delta / maxf(data.ads_time, 0.01))
@@ -126,6 +148,14 @@ func _process(delta: float) -> void:
 	_player.add_view_rotation(deg_to_rad(-change.x), deg_to_rad(change.y))
 
 
+func _select(index: int) -> void:
+	slot = index
+	data = loadout[index]
+	state = _states[index]
+	weapon_changed.emit(data)
+	ammo_changed.emit(state.ammo, data.magazine_size)
+
+
 func _reload() -> void:
 	if state.start_reload():
 		reload_started.emit(data.reload_time)
@@ -139,9 +169,14 @@ func _fire(cmd: InputCmd) -> void:
 
 	var spread := state.roll_spread(current_spread_deg())
 	var view := Basis.from_euler(Vector3(cmd.pitch, cmd.yaw, 0.0))
-	var direction := (-view.z).rotated(view.y, spread.x).rotated(view.x, spread.y).normalized()
+	var aim := (-view.z).rotated(view.y, spread.x).rotated(view.x, spread.y).normalized()
 	var origin: Vector3 = _player.eye_position()
-	resolve_shot.call(origin, direction)
+	for pellet in data.pellets:
+		var direction := aim
+		if data.pellets > 1:
+			var offset := state.roll_spread(data.pellet_spread_deg)
+			direction = aim.rotated(view.y, offset.x).rotated(view.x, offset.y).normalized()
+		resolve_shot.call(origin, direction)
 
 	fired.emit(kick)
 	ammo_changed.emit(state.ammo, data.magazine_size)

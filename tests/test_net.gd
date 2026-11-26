@@ -14,9 +14,12 @@ func test_input_round_trip() -> String:
 	cmd.pitch = -0.4
 	cmd.buttons = InputCmd.FIRE | InputCmd.AIM
 	cmd.view_tick = 1234.5
+	cmd.weapon = 2
 	var copy: InputCmd = InputCmd.from_array(cmd.to_array())
 	if copy == null:
 		return "valid input was rejected"
+	if copy.weapon != 2:
+		return "round trip changed the weapon slot"
 	if copy.seq != 42 or copy.buttons != cmd.buttons or not copy.move.is_equal_approx(cmd.move):
 		return "round trip changed the input"
 	if absf(copy.yaw - 1.2) > 0.0001 or absf(copy.pitch + 0.4) > 0.0001:
@@ -27,12 +30,13 @@ func test_input_round_trip() -> String:
 func test_input_rejects_malformed_data() -> String:
 	var bad_inputs := [
 		[],
-		[1, Vector2.ZERO, 0.0, 0.0, 0],
-		["1", Vector2.ZERO, 0.0, 0.0, 0, 0.0],
-		[1, "move", 0.0, 0.0, 0, 0.0],
-		[1, Vector2.ZERO, NAN, 0.0, 0, 0.0],
-		[1, Vector2(INF, 0.0), 0.0, 0.0, 0, 0.0],
-		[1, Vector2.ZERO, 0.0, 0.0, 0.5, 0.0],
+		[1, Vector2.ZERO, 0.0, 0.0, 0, 0.0],
+		["1", Vector2.ZERO, 0.0, 0.0, 0, 0.0, 0],
+		[1, "move", 0.0, 0.0, 0, 0.0, 0],
+		[1, Vector2.ZERO, NAN, 0.0, 0, 0.0, 0],
+		[1, Vector2(INF, 0.0), 0.0, 0.0, 0, 0.0, 0],
+		[1, Vector2.ZERO, 0.0, 0.0, 0.5, 0.0, 0],
+		[1, Vector2.ZERO, 0.0, 0.0, 0, 0.0, "rifle"],
 	]
 	for index in bad_inputs.size():
 		if InputCmd.from_array(bad_inputs[index]) != null:
@@ -42,7 +46,7 @@ func test_input_rejects_malformed_data() -> String:
 
 func test_input_clamps_cheating_values() -> String:
 	# 속도를 올리려고 이동 벡터를 키우거나, 없는 버튼 비트를 넣거나, 시선을 뒤집는 값을 잘라 낸다.
-	var cmd: InputCmd = InputCmd.from_array([7, Vector2(50.0, 0.0), 100.0, 9.0, 4095, 0.0])
+	var cmd: InputCmd = InputCmd.from_array([7, Vector2(50.0, 0.0), 100.0, 9.0, 4095, 0.0, 99])
 	if cmd == null:
 		return "input was rejected instead of clamped"
 	if cmd.move.length() > 1.0001:
@@ -53,6 +57,8 @@ func test_input_clamps_cheating_values() -> String:
 		return "yaw %f was not wrapped" % cmd.yaw
 	if cmd.buttons != InputCmd.ALL_BUTTONS:
 		return "unknown button bits were kept"
+	if cmd.weapon != InputCmd.MAX_WEAPON_SLOT:
+		return "weapon slot %d was not clamped" % cmd.weapon
 	return ""
 
 

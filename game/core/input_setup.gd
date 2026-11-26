@@ -11,6 +11,12 @@ const KEY_ACTIONS := {
 	"sprint": KEY_SHIFT,
 	"crouch": KEY_CTRL,
 	"reload": KEY_R,
+	"weapon_1": KEY_1,
+	"weapon_2": KEY_2,
+	"weapon_3": KEY_3,
+	"weapon_4": KEY_4,
+	"sens_down": KEY_MINUS,
+	"sens_up": KEY_EQUAL,
 }
 
 const MOUSE_ACTIONS := {

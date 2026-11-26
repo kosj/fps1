@@ -16,8 +16,14 @@ const WeaponController := preload("res://game/weapons/weapon_controller.gd")
 const ViewModel := preload("res://game/weapons/view_model.gd")
 const Hud := preload("res://game/ui/hud.gd")
 const SfxSynth := preload("res://game/audio/sfx_synth.gd")
-const DEFAULT_WEAPON := preload("res://game/weapons/data/rifle_vk7.tres")
-const MOUSE_SENSITIVITY := 0.002
+const LOADOUT := [
+	preload("res://game/weapons/data/rifle_vk7.tres"),
+	preload("res://game/weapons/data/smg_kestrel.tres"),
+	preload("res://game/weapons/data/shotgun_m90.tres"),
+	preload("res://game/weapons/data/sniper_lr12.tres"),
+]
+const SETTINGS_PATH := "user://settings.cfg"
+const BASE_SENSITIVITY := 0.002
 const ADS_SENSITIVITY_SCALE := 0.6
 const PITCH_LIMIT := 1.55
 const BASE_FOV := 80.0
@@ -46,6 +52,8 @@ var auto_simulate := true
 var view_from_cmd := false
 ## 헤드리스 테스트에는 포인터 잠금이 없으므로 끌 수 있게 한다.
 var require_mouse_capture := true
+## 마우스 감도 배율. - 와 = 키로 조절하고 설정 파일에 저장한다.
+var sensitivity_scale := 1.0
 var weapon: WeaponController
 var view_model: ViewModel
 var hud: Hud
@@ -58,6 +66,7 @@ var _mantle_to := Vector3.ZERO
 var _mantle_progress := 0.0
 var _prev_buttons := 0
 var _suppress_fire := false
+var _selected_slot := 0
 var _step_distance := 0.0
 var _shape: CapsuleShape3D
 var _sounds := {}
@@ -88,10 +97,10 @@ func _ready() -> void:
 		_build_view()
 	else:
 		_camera.current = false
-	weapon.setup(self, DEFAULT_WEAPON)
+	weapon.setup(self, LOADOUT)
 	if is_local:
-		hud.set_weapon_name(weapon.data.display_name)
 		hud.set_health(health, MAX_HEALTH)
+		_load_settings()
 
 
 ## 입력을 받아도 되는 상태인지. 브라우저에서는 클릭으로 포인터를 잠근 뒤부터 조작한다.
@@ -146,6 +155,10 @@ func gather_cmd() -> InputCmd:
 	for action: String in _button_actions:
 		if Input.is_action_pressed(action):
 			cmd.buttons |= int(_button_actions[action])
+	for index in LOADOUT.size():
+		if Input.is_action_pressed("weapon_%d" % (index + 1)):
+			_selected_slot = index
+	cmd.weapon = _selected_slot
 	# 포인터를 잠그려고 누른 클릭이 그대로 발사되지 않게 한다.
 	if _suppress_fire:
 		if cmd.has(InputCmd.FIRE):
@@ -213,7 +226,7 @@ func restore_state(state: Array) -> void:
 
 
 ## 서버가 알려 준 체력과 생존 여부를 반영한다.
-func apply_net_status(new_health: float, new_alive: bool, ammo: int) -> void:
+func apply_net_status(new_health: float, new_alive: bool, ammo: int, server_slot: int) -> void:
 	if new_alive and not alive:
 		weapon.reset()
 		move_state = MoveState.NORMAL
@@ -227,7 +240,7 @@ func apply_net_status(new_health: float, new_alive: bool, ammo: int) -> void:
 		if is_local:
 			hud.set_health(health, MAX_HEALTH)
 	# 예측한 탄약이 서버와 크게 어긋났을 때만 맞춘다(발사 직후의 작은 차이는 정상).
-	if absi(weapon.state.ammo - ammo) > 3:
+	if server_slot == weapon.slot and absi(weapon.state.ammo - ammo) > 3:
 		weapon.state.ammo = ammo
 		weapon.ammo_changed.emit(ammo, weapon.data.magazine_size)
 
@@ -254,9 +267,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		_suppress_fire = true
 	elif event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	elif event.is_action_pressed("sens_down"):
+		_set_sensitivity(sensitivity_scale / 1.1)
+	elif event.is_action_pressed("sens_up"):
+		_set_sensitivity(sensitivity_scale * 1.1)
+	elif event is InputEventMouseButton and event.is_pressed() and captured:
+		# 마우스 휠로 다음/이전 무기.
+		var button := (event as InputEventMouseButton).button_index
+		if button == MOUSE_BUTTON_WHEEL_DOWN:
+			_selected_slot = (_selected_slot + 1) % LOADOUT.size()
+		elif button == MOUSE_BUTTON_WHEEL_UP:
+			_selected_slot = (_selected_slot + LOADOUT.size() - 1) % LOADOUT.size()
 	elif event is InputEventMouseMotion and captured:
 		var motion := event as InputEventMouseMotion
-		var sensitivity := MOUSE_SENSITIVITY * lerpf(1.0, ADS_SENSITIVITY_SCALE, weapon.aim_blend)
+		var zoom := weapon.data.ads_fov / BASE_FOV
+		var ads_scale := lerpf(1.0, ADS_SENSITIVITY_SCALE * zoom / 0.6875, weapon.aim_blend)
+		var sensitivity := BASE_SENSITIVITY * sensitivity_scale * ads_scale
 		add_view_rotation(-motion.relative.x * sensitivity, -motion.relative.y * sensitivity)
 		view_model.add_look_delta(motion.relative)
 
@@ -436,6 +462,7 @@ func _build_view() -> void:
 	weapon.reload_started.connect(_on_reload_started)
 	weapon.reload_finished.connect(_on_reload_finished)
 	weapon.dry_fired.connect(_play.bind("dry"))
+	weapon.weapon_changed.connect(_on_weapon_changed)
 
 
 func _add_sound(key: String, stream: AudioStream, polyphony: int, volume_db: float) -> void:
@@ -464,6 +491,26 @@ func _on_impact(point: Vector3, _normal: Vector3) -> void:
 	get_parent().add_child(marker)
 	marker.global_position = point
 	get_tree().create_timer(IMPACT_LIFETIME).timeout.connect(marker.queue_free)
+
+
+func _on_weapon_changed(data: Resource) -> void:
+	hud.set_weapon_name("%d  %s" % [weapon.slot + 1, data.get("display_name")])
+	hud.set_reloading(false)
+	view_model.play_reload(WeaponController.SWITCH_TIME)
+
+
+func _set_sensitivity(value: float) -> void:
+	sensitivity_scale = clampf(value, 0.2, 5.0)
+	hud.show_notice("SENSITIVITY %.2f" % sensitivity_scale)
+	var config := ConfigFile.new()
+	config.set_value("input", "sensitivity_scale", sensitivity_scale)
+	config.save(SETTINGS_PATH)
+
+
+func _load_settings() -> void:
+	var config := ConfigFile.new()
+	if config.load(SETTINGS_PATH) == OK:
+		sensitivity_scale = clampf(config.get_value("input", "sensitivity_scale", 1.0), 0.2, 5.0)
 
 
 func _on_reload_started(duration: float) -> void:
