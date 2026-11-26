@@ -1,7 +1,6 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://maps/graybox/graybox.gd" id="1_map"]
-[ext_resource type="Script" path="res://game/movement/player_controller.gd" id="2_player"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_material"]
 
@@ -18,14 +17,10 @@ albedo_color = Color(0.36, 0.38, 0.4, 1)
 
 [sub_resource type="BoxMesh" id="floor_mesh"]
 material = SubResource("floor_material")
-size = Vector3(40, 1, 40)
+size = Vector3(160, 1, 160)
 
 [sub_resource type="BoxShape3D" id="floor_shape"]
-size = Vector3(40, 1, 40)
-
-[sub_resource type="CapsuleShape3D" id="player_shape"]
-radius = 0.35
-height = 1.8
+size = Vector3(160, 1, 160)
 
 [node name="Graybox" type="Node3D"]
 script = ExtResource("1_map")
@@ -44,18 +39,3 @@ mesh = SubResource("floor_mesh")
 
 [node name="Collision" type="CollisionShape3D" parent="Floor"]
 shape = SubResource("floor_shape")
-
-[node name="Player" type="CharacterBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
-script = ExtResource("2_player")
-
-[node name="Collision" type="CollisionShape3D" parent="Player"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
-shape = SubResource("player_shape")
-
-[node name="Head" type="Node3D" parent="Player"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
-
-[node name="Camera" type="Camera3D" parent="Player/Head"]
-current = true
-fov = 80.0

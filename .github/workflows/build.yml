@@ -55,10 +55,27 @@ jobs:
       - name: Import project
         run: |
           chmod +x ~/godot/godot
-          ~/godot/godot --headless --import
+          ~/godot/godot --headless --import 2>&1 | tee import.log
+          ! grep -q "SCRIPT ERROR" import.log
 
       - name: Run unit tests
-        run: ~/godot/godot --headless --script res://tests/run_tests.gd
+        run: |
+          ~/godot/godot --headless --script res://tests/run_tests.gd 2>&1 | tee unit.log
+          ! grep -q "SCRIPT ERROR" unit.log
+
+      - name: Run gameplay smoke test
+        run: |
+          ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn 2>&1 | tee smoke.log
+          ! grep -q "SCRIPT ERROR" smoke.log
+
+      - name: Run network test (server + 2 bot clients, 50 ms delay each way)
+        run: GODOT=~/godot/godot tests/net/run_net_test.sh lagcomp
+
+      - name: Run network test with lag compensation off (must mostly miss)
+        run: GODOT=~/godot/godot PORT=7789 tests/net/run_net_test.sh nolagcomp
+
+      - name: Run prediction test (sprint, slide, jump under 80 ms delay)
+        run: GODOT=~/godot/godot PORT=7790 tests/net/run_net_test.sh prediction
 
       - name: Export Windows
         run: |

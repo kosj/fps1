@@ -2,7 +2,7 @@
 
 Windows와 웹에서 서비스하는 6v6 멀티플레이 1인칭 슈터입니다. Godot 4.7로 개발합니다.
 
-현재 단계는 **M0 준비**입니다. 그레이박스 맵에서 걷기, 달리기, 점프, 시점 조작만 됩니다.
+현재 단계는 **M2 넷코드 검증**까지입니다. 혼자 사격장에서 연습하거나, 서버를 띄워 여러 명이 접속해 서로 쏠 수 있습니다. 모델과 소리는 임시이고 메뉴 화면은 아직 없습니다.
 
 ## 실행
 
@@ -13,16 +13,50 @@ Windows와 웹에서 서비스하는 6v6 멀티플레이 1인칭 슈터입니다
 | --- | --- |
 | 이동 | W A S D |
 | 달리기 | Shift (전진 중) |
-| 점프 | Space |
+| 점프 / 난간 넘기 | Space (난간 앞에서 누르면 넘기) |
+| 앉기 / 슬라이딩 | Ctrl (달리는 중 누르면 슬라이딩) |
+| 발사 / 정조준 | 마우스 왼쪽 / 오른쪽 |
+| 재장전 | R |
 | 마우스 잠금 | 화면 클릭 |
 | 마우스 해제 | Esc |
+
+## 멀티플레이 실행
+
+메뉴가 생기기 전까지는 명령줄 인자로 실행 방식을 정합니다. 인자는 `--` 뒤에 붙입니다.
+
+```
+# 서버 (화면 없이)
+godot --headless -- --server --port=7777
+
+# 클라이언트
+godot -- --connect=127.0.0.1:7777
+```
+
+- 내보낸 Windows 빌드는 `fps1.exe -- --connect=호스트:포트`로 접속합니다.
+- 웹 빌드는 주소 뒤에 `?connect=호스트:포트`를 붙입니다. HTTPS 페이지에서는 `?connect=wss://주소` 형식의 TLS 서버가 필요합니다.
+- Linux 서버 빌드(`fps1-linux-server`)는 인자 없이 실행해도 서버로 동작합니다.
+- 인자 없이 실행하면 혼자 연습하는 오프라인 사격장입니다.
+
+구조는 권위 서버 방식입니다. 클라이언트는 자기 움직임을 먼저 보여 주고(예측) 서버 결과와 다르면 고쳐 계산하며(보정),
+서버는 쏜 사람이 화면에서 보던 시점으로 상대 위치를 되감아 명중을 판정합니다(지연 보상, 최대 300ms).
 
 ## 테스트
 
 ```
 godot --headless --import
 godot --headless --script res://tests/run_tests.gd
+godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn
+GODOT=godot tests/net/run_net_test.sh lagcomp
+GODOT=godot tests/net/run_net_test.sh nolagcomp
+GODOT=godot tests/net/run_net_test.sh prediction
 ```
+
+- 단위 테스트: 이동, 무기, 판정, 입력 검증 같은 순수 계산
+- 통합 테스트(smoke): 실제 플레이어 씬으로 걷기, 사격, 재장전, 슬라이딩, 난간 넘기
+- 네트워크 테스트: 서버와 봇 클라이언트를 실제 프로세스로 띄워 지연을 넣고 확인
+  - `lagcomp`: 양방향 50ms 지연에서 좌우로 움직이는 상대를 맞히는지
+  - `nolagcomp`: 지연 보상을 끄면 같은 조건에서 거의 못 맞히는지(테스트 자체의 검증)
+  - `prediction`: 80ms 지연에서 달리기, 슬라이딩, 점프의 예측이 서버 결과와 일치하는지
 
 ## 빌드
 
@@ -40,7 +74,7 @@ godot --headless --script res://tests/run_tests.gd
 ## 폴더 구조
 
 ```
-game/             core, movement (이후 weapons, net, bots, ui, audio)
+game/             core, movement, player, weapons, combat, ui, audio, net, bots
 maps/             맵 씬
 art/              Blender에서 내보낸 GLB, 머티리얼
 audio/            후처리를 마친 사운드
