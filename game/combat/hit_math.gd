@@ -43,3 +43,25 @@ static func player_hit(origin: Vector3, direction: Vector3, feet: Vector3, low: 
 	if head >= 0.0 and (body < 0.0 or head <= body):
 		return [head, true]
 	return [body, false]
+
+
+## 위치 기록([틱, 위치, low] 목록)에서 특정 틱의 [위치, low]를 보간해 구한다. 기록이 없으면 빈 배열.
+static func history_at(history: Array, tick: float) -> Array:
+	if history.is_empty():
+		return []
+	var newer: Array = history.back()
+	var older: Array = history.front()
+	for index in range(history.size() - 1, -1, -1):
+		var entry: Array = history[index]
+		if float(entry[0]) <= tick:
+			older = entry
+			newer = history[mini(index + 1, history.size() - 1)]
+			break
+		newer = entry
+	var span := float(newer[0]) - float(older[0])
+	var weight := 0.0
+	if span > 0.0:
+		weight = clampf((tick - float(older[0])) / span, 0.0, 1.0)
+	var from: Vector3 = older[1]
+	var to: Vector3 = newer[1]
+	return [from.lerp(to, weight), older[2]]

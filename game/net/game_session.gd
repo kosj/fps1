@@ -40,7 +40,9 @@ const PauseMenu := preload("res://game/ui/pause_menu.gd")
 ## 이 인자가 하나라도 있으면 메뉴 없이 바로 시작한다(서버, 자동 테스트, 웹 주소창 접속).
 const DIRECT_START_ARGS := ["server", "connect", "range", "spectate", "bots", "bot", "exit-after"]
 const PLAYER_SCENE := preload("res://game/player/player.tscn")
-const DEFAULT_MAP := "res://maps/graybox/graybox.tscn"
+const NavGraph := preload("res://game/bots/nav_graph.gd")
+const DEFAULT_MAP := "res://maps/depot/depot.tscn"
+const RANGE_MAP := "res://maps/graybox/graybox.tscn"
 const HISTORY_SIZE := 64
 const PENDING_LIMIT := 240
 const SCORE_LIMIT := 30
@@ -93,6 +95,7 @@ var _team_scores := [0, 0]
 var _time_left := MATCH_TIME
 var _intermission_left := 0.0
 var _nav_points: Array = []
+var _navigator: NavGraph
 var _last_local_health := Protocol.MAX_HEALTH
 ## 점령전일 때만 있다. 판정 권한이 있는 쪽이 갱신한다.
 var _domination: Domination
@@ -120,10 +123,7 @@ func _ready() -> void:
 	_delay_ticks = int(round(float(_args.get("net-delay-ms", "0")) * Protocol.TICK_RATE / 1000.0))
 	if _args.has("bot"):
 		_bot = ScriptBot.new(str(_args["bot"]))
-	_map = load(str(_args.get("map", DEFAULT_MAP))).instantiate()
-	add_child(_map)
-
-	_nav_points = _map.call("nav_points")
+	_load_map(str(_args.get("map", RANGE_MAP if _args.has("range") else DEFAULT_MAP)))
 
 	var direct := OS.has_feature("dedicated_server")
 	for key: String in DIRECT_START_ARGS:
@@ -134,6 +134,18 @@ func _ready() -> void:
 		_menu = MainMenu.new()
 		_menu.start_requested.connect(_on_start_requested)
 		add_child(_menu)
+
+
+func _load_map(path: String) -> void:
+	if _map != null:
+		remove_child(_map)
+		_map.queue_free()
+	_map = load(path).instantiate()
+	add_child(_map)
+	_nav_points = _map.call("nav_points")
+	_navigator = null
+	if _map.has_method("nav_graph"):
+		_navigator = NavGraph.new(_map.call("nav_graph"))
 
 
 func is_started() -> bool:
@@ -185,6 +197,7 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 			_start_client(str(options["address"]))
 		"range":
 			mode = Mode.RANGE
+			_load_map(RANGE_MAP)
 			if _map.has_method("spawn_offline_targets"):
 				_map.call("spawn_offline_targets")
 			_local = _spawn_player(true, 0)
@@ -396,6 +409,7 @@ func _add_bots(count: int) -> void:
 		var bot := CombatBot.new(id * 7919, entry["player"].rotation.y)
 		# 봇은 소총, 기관단총, 산탄총을 번갈아 든다. 저격총은 봇의 조준 방식과 맞지 않아 뺀다.
 		bot.weapon_slot = index % 3
+		bot.navigator = _navigator
 		entry["bot"] = bot
 
 
@@ -438,10 +452,13 @@ func _add_participant(id: int, kind: String) -> Dictionary:
 
 ## 팀 스폰 중 살아 있는 적에게서 가장 먼 곳을 고른다. 적이 없으면 팀별로 정해진 자리를 쓴다.
 func _pick_spawn(team: int, self_id: int) -> int:
-	var count: int = _map.call("spawn_count")
-	var best := team % count
+	# 팀별 스폰이 정해진 맵에서는 자기 진영에서만 고른다.
+	var candidates: Array = range(int(_map.call("spawn_count")))
+	if _map.has_method("spawn_indices_for"):
+		candidates = _map.call("spawn_indices_for", team)
+	var best: int = candidates[(self_id + team) % candidates.size()]
 	var best_distance := -1.0
-	for index in count:
+	for index: int in candidates:
 		var spot: Transform3D = _map.call("spawn_point", index)
 		var nearest := INF
 		for other: int in _peers:
@@ -716,7 +733,7 @@ func _resolve_shot(origin: Vector3, direction: Vector3, shooter_id: int) -> void
 		# 같은 팀은 맞지 않는다.
 		if int(_peers[id]["team"]) == int(shooter_entry["team"]):
 			continue
-		var past := _history_at(_peers[id]["history"], rewind_tick)
+		var past: Array = HitMath.history_at(_peers[id]["history"], rewind_tick)
 		if past.is_empty():
 			continue
 		var hit := HitMath.player_hit(origin, direction, past[0], past[1])
@@ -760,28 +777,6 @@ func _announce_kill(killer: int, victim: int, killer_team: int, headshot: bool) 
 	for id: int in _peers:
 		if str(_peers[id]["kind"]) == "peer":
 			_rpc_kill.rpc_id(id, killer, victim, killer_team, headshot)
-
-
-## 기록에서 특정 틱의 [위치, low]를 보간해 구한다. 기록이 없으면 빈 배열.
-func _history_at(history: Array, tick: float) -> Array:
-	if history.is_empty():
-		return []
-	var newer: Array = history.back()
-	var older: Array = history.front()
-	for index in range(history.size() - 1, -1, -1):
-		var entry: Array = history[index]
-		if float(entry[0]) <= tick:
-			older = entry
-			newer = history[mini(index + 1, history.size() - 1)]
-			break
-		newer = entry
-	var span := float(newer[0]) - float(older[0])
-	var weight := 0.0
-	if span > 0.0:
-		weight = clampf((tick - float(older[0])) / span, 0.0, 1.0)
-	var from: Vector3 = older[1]
-	var to: Vector3 = newer[1]
-	return [from.lerp(to, weight), older[2]]
 
 
 # ---------------------------------------------------------------- 클라이언트

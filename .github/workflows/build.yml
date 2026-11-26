@@ -76,6 +76,11 @@ jobs:
           ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn 2>&1 | tee smoke.log
           ! grep -q "SCRIPT ERROR" smoke.log
 
+      - name: Check the Depot map (spawns, navigation links, sightlines)
+        run: |
+          ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/map_check.tscn 2>&1 | tee map.log
+          ! grep -q "SCRIPT ERROR" map.log
+
       - name: Run menu smoke test
         run: |
           ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/menu_smoke.tscn 2>&1 | tee menu.log
