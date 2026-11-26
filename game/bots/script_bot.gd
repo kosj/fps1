@@ -7,7 +7,8 @@ const STRAFE_PERIOD := 3.0
 const AIM_HEIGHT := 1.0
 const FIRE_DELAY := 1.0
 
-## "idle", "strafer"(좌우 왕복), "shooter"(가장 가까운 적을 조준 사격).
+## "idle", "strafer"(좌우 왕복), "shooter"(가장 가까운 적을 조준 사격),
+## "runner"(달리기, 슬라이딩, 점프, 앉기를 섞어 이동 예측을 시험).
 var kind := "idle"
 
 var _time := 0.0
@@ -27,7 +28,31 @@ func make_cmd(delta: float, eye: Vector3, targets: Array) -> InputCmd:
 			cmd.move.x = 1.0 if fmod(_time, STRAFE_PERIOD) < STRAFE_PERIOD / 2.0 else -1.0
 		"shooter":
 			_aim_and_fire(cmd, delta, eye, targets)
+		"runner":
+			_run_course(cmd)
 	return cmd
+
+
+## 6초 주기로 달리기 → 슬라이딩 → 점프 → 시선을 돌리며 옆걸음 → 앉아서 후진을 반복한다.
+func _run_course(cmd: InputCmd) -> void:
+	var phase := fmod(_time, 6.0)
+	if phase < 1.5:
+		cmd.move = Vector2(0.0, -1.0)
+		cmd.buttons = InputCmd.SPRINT
+	elif phase < 1.7:
+		cmd.move = Vector2(0.0, -1.0)
+		cmd.buttons = InputCmd.SPRINT | InputCmd.CROUCH
+	elif phase < 3.0:
+		cmd.move = Vector2(0.0, -1.0)
+	elif phase < 3.2:
+		cmd.move = Vector2(0.0, -1.0)
+		cmd.buttons = InputCmd.JUMP
+	elif phase < 4.5:
+		cmd.move = Vector2(1.0, 0.0)
+		cmd.yaw = 0.8 * sin(_time * 2.0)
+	else:
+		cmd.move = Vector2(0.0, 1.0)
+		cmd.buttons = InputCmd.CROUCH
 
 
 func _aim_and_fire(cmd: InputCmd, delta: float, eye: Vector3, targets: Array) -> void:

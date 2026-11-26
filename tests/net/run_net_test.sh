@@ -4,7 +4,7 @@
 #   - 두 클라이언트가 접속하고 스냅샷을 받는다
 #   - 좌우로 움직이는 봇의 예측 보정 횟수가 적다(예측과 서버 결과가 일치)
 #   - 사격 봇이 움직이는 상대를 맞힌다(지연 보상이 동작)
-# 사용법: tests/net/run_net_test.sh [lagcomp|nolagcomp]
+# 사용법: tests/net/run_net_test.sh [lagcomp|nolagcomp|prediction]
 set -u
 GODOT="${GODOT:-godot}"
 VARIANT="${1:-lagcomp}"
@@ -19,6 +19,30 @@ if [ "$VARIANT" = "nolagcomp" ]; then
   # 지연 보상을 끄면 같은 조건에서 거의 맞지 않아야 한다. 테스트가 실제로 지연 보상을 검증하는지 확인한다.
   SERVER_FLAGS="$SERVER_FLAGS --no-lagcomp"
   SHOOTER_FLAGS="--max-hit-ratio=0.3"
+fi
+
+if [ "$VARIANT" = "prediction" ]; then
+  # 달리기, 슬라이딩, 점프, 앉기를 섞은 이동을 80ms 지연에서 예측한다.
+  # 접속 직후의 위치 맞춤 1회를 빼면 서버 결과와 어긋나서는 안 된다.
+  "$GODOT" --headless -- --server --port=$PORT --map=$MAP --exit-after=18 --expect-players=1 \
+    > "$OUT/server.log" 2>&1 &
+  SERVER_PID=$!
+  sleep 3
+  "$GODOT" --headless -- --connect=127.0.0.1:$PORT --map=$MAP --bot=runner \
+    --net-delay-ms=80 --exit-after=13 --max-corrections=2 > "$OUT/runner.log" 2>&1 &
+  RUNNER_PID=$!
+  STATUS=0
+  wait $RUNNER_PID || STATUS=1
+  wait $SERVER_PID || STATUS=1
+  for name in server runner; do
+    echo "----- $name ($VARIANT)"
+    grep -E "NETSTATS|NETTEST|ERROR|error|joined|connected" "$OUT/$name.log" || true
+    if grep -q "SCRIPT ERROR" "$OUT/$name.log"; then
+      grep -A4 "SCRIPT ERROR" "$OUT/$name.log" | head -40
+      STATUS=1
+    fi
+  done
+  exit $STATUS
 fi
 
 "$GODOT" --headless -- $SERVER_FLAGS > "$OUT/server.log" 2>&1 &

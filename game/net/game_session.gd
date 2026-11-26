@@ -9,9 +9,9 @@ extends Node
 ##
 ## 명령줄 인자(godot ... -- 뒤에 붙인다):
 ##   --server --port=7777        서버로 실행
-##   --connect=127.0.0.1:7777    서버에 접속
+##   --connect=127.0.0.1:7777    서버에 접속 (wss://host/path 형식도 가능, 웹은 주소창에 ?connect=...)
 ##   --map=res://...tscn         맵 지정
-##   --bot=strafer|shooter       사람 대신 봇이 조작(자동 테스트)
+##   --bot=strafer|shooter|runner 사람 대신 봇이 조작(자동 테스트)
 ##   --net-delay-ms=50           클라이언트 송수신에 인위적 지연 추가(자동 테스트)
 ##   --no-lagcomp                지연 보상 끄기(비교 테스트)
 ##   --exit-after=10             N초 뒤 통계를 출력하고 종료
@@ -128,6 +128,13 @@ func _parse_args() -> void:
 			continue
 		var parts := argument.substr(2).split("=", true, 1)
 		_args[parts[0]] = parts[1] if parts.size() > 1 else ""
+	# 웹 빌드에는 명령줄이 없으므로 주소창의 ?connect=호스트:포트 를 읽는다.
+	if OS.has_feature("web"):
+		var query := str(JavaScriptBridge.eval("window.location.search", true))
+		for pair in query.trim_prefix("?").split("&", false):
+			var parts := pair.split("=", true, 1)
+			if parts.size() == 2 and parts[0] in ["connect", "map"]:
+				_args[parts[0]] = parts[1].uri_decode()
 
 
 func _spawn_player(local: bool, spawn_index: int):
@@ -358,7 +365,9 @@ func _history_at(history: Array, tick: float) -> Array:
 
 func _start_client(address: String) -> void:
 	var peer := WebSocketMultiplayerPeer.new()
-	var error := peer.create_client("ws://" + address)
+	# https 페이지에서는 브라우저가 wss://만 허용하므로 전체 주소도 받는다.
+	var url := address if address.contains("://") else "ws://" + address
+	var error := peer.create_client(url)
 	if error != OK:
 		printerr("could not start connecting to %s (error %d)" % [address, error])
 		get_tree().quit(1)

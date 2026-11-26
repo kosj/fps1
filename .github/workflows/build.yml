@@ -74,6 +74,9 @@ jobs:
       - name: Run network test with lag compensation off (must mostly miss)
         run: GODOT=~/godot/godot PORT=7789 tests/net/run_net_test.sh nolagcomp
 
+      - name: Run prediction test (sprint, slide, jump under 80 ms delay)
+        run: GODOT=~/godot/godot PORT=7790 tests/net/run_net_test.sh prediction
+
       - name: Export Windows
         run: |
           mkdir -p build/windows
