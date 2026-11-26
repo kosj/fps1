@@ -11,10 +11,10 @@ const MIN_UI_SCALE := 0.8
 const MAX_UI_SCALE := 2.0
 ## 휴대폰은 화면이 작아 같은 배율로는 글자가 작게 보이므로 기본값을 키운다.
 const MOBILE_UI_SCALE := 1.5
-
-static var _mobile := -1
 const MIN_SENSITIVITY := 0.2
 const MAX_SENSITIVITY := 4.0
+
+static var _mobile := -1
 
 
 ## key는 "섹션/이름" 형식.
