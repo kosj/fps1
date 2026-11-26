@@ -2,7 +2,7 @@
 
 Windows와 웹에서 서비스하는 6v6 멀티플레이 1인칭 슈터입니다. Godot 4.7로 개발합니다.
 
-현재 단계는 **M0 준비**입니다. 그레이박스 맵에서 걷기, 달리기, 점프, 시점 조작만 됩니다.
+현재 단계는 **M1 건플레이 프로토타입**입니다. 그레이박스 사격장에서 소총 1종으로 사격, 재장전, 슬라이딩, 난간 넘기를 해 볼 수 있습니다. 모델과 소리는 임시입니다.
 
 ## 실행
 
@@ -13,7 +13,10 @@ Windows와 웹에서 서비스하는 6v6 멀티플레이 1인칭 슈터입니다
 | --- | --- |
 | 이동 | W A S D |
 | 달리기 | Shift (전진 중) |
-| 점프 | Space |
+| 점프 / 난간 넘기 | Space (난간 앞에서 누르면 넘기) |
+| 앉기 / 슬라이딩 | Ctrl (달리는 중 누르면 슬라이딩) |
+| 발사 / 정조준 | 마우스 왼쪽 / 오른쪽 |
+| 재장전 | R |
 | 마우스 잠금 | 화면 클릭 |
 | 마우스 해제 | Esc |
 
@@ -22,7 +25,10 @@ Windows와 웹에서 서비스하는 6v6 멀티플레이 1인칭 슈터입니다
 ```
 godot --headless --import
 godot --headless --script res://tests/run_tests.gd
+godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn
 ```
+
+첫 줄은 순수 계산의 단위 테스트, 둘째 줄은 실제 플레이어 씬을 돌리는 통합 테스트입니다.
 
 ## 빌드
 
@@ -40,7 +46,7 @@ godot --headless --script res://tests/run_tests.gd
 ## 폴더 구조
 
 ```
-game/             core, movement (이후 weapons, net, bots, ui, audio)
+game/             core, movement, player, weapons, combat, ui, audio (이후 net, bots)
 maps/             맵 씬
 art/              Blender에서 내보낸 GLB, 머티리얼
 audio/            후처리를 마친 사운드
