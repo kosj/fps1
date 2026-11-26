@@ -195,7 +195,7 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 			_add_bots(int(options.get("bots", 5)))
 	_pause = PauseMenu.new()
 	_pause.visible = false
-	_pause.resume_requested.connect(func() -> void: Input.mouse_mode = Input.MOUSE_MODE_CAPTURED)
+	_pause.resume_requested.connect(_resume)
 	_pause.menu_requested.connect(_return_to_menu)
 	_pause.sensitivity_changed.connect(_on_sensitivity_changed)
 	add_child(_pause)
@@ -259,6 +259,13 @@ func _show_kill(killer: int, victim: int, killer_team: int, headshot: bool, own_
 	if headshot:
 		text += "  (HS)"
 	_local.hud.add_feed_line(text, _relative_color(killer_team))
+
+
+func _resume() -> void:
+	if _local != null and _local.touch != null:
+		_local.set_paused(false)
+	else:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _on_sensitivity_changed(value: float) -> void:

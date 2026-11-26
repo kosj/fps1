@@ -15,7 +15,7 @@ static func label(text: String, font_size: int) -> Label:
 static func button(text: String) -> Button:
 	var node := Button.new()
 	node.text = text
-	node.custom_minimum_size = Vector2(320.0, 42.0)
+	node.custom_minimum_size = Vector2(320.0, 46.0)
 	node.add_theme_font_size_override("font_size", 20)
 	return node
 
@@ -26,9 +26,15 @@ static func centered_column(layer: CanvasLayer, background: Color) -> VBoxContai
 	shade.color = background
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(shade)
+	# 작은 화면에서는 메뉴가 화면보다 길어질 수 있어 스크롤로 감싼다.
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	shade.add_child(scroll)
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	shade.add_child(center)
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(center)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 10)
 	center.add_child(column)

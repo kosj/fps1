@@ -11,6 +11,7 @@ const SUITES := {
 	"bot": preload("res://tests/test_bot.gd"),
 	"weapons": preload("res://tests/test_weapons.gd"),
 	"domination": preload("res://tests/test_domination.gd"),
+	"touch": preload("res://tests/test_touch.gd"),
 }
 
 
