@@ -78,17 +78,26 @@ jobs:
           ~/godot/godot --headless --export-release "Linux Server" build/server/fps1_server.x86_64
           test -s build/server/fps1_server.x86_64
 
+      # 계정의 아티팩트 저장 용량이 차면 업로드만 실패하므로 빌드 결과와 분리한다.
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
+          retention-days: 3
           name: fps1-windows
           path: build/windows
 
+      # 계정의 아티팩트 저장 용량이 차면 업로드만 실패하므로 빌드 결과와 분리한다.
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
+          retention-days: 3
           name: fps1-web
           path: build/web
 
+      # 계정의 아티팩트 저장 용량이 차면 업로드만 실패하므로 빌드 결과와 분리한다.
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
+          retention-days: 3
           name: fps1-linux-server
           path: build/server
