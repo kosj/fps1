@@ -55,10 +55,8 @@ func test_input_clamps_cheating_values() -> String:
 		return "pitch %f was not clamped" % cmd.pitch
 	if absf(cmd.yaw) > PI + 0.0001:
 		return "yaw %f was not wrapped" % cmd.yaw
-	if cmd.buttons != InputCmd.ALL_BUTTONS:
-		return "unknown button bits were kept"
-	if cmd.weapon != InputCmd.MAX_WEAPON_SLOT:
-		return "weapon slot %d was not clamped" % cmd.weapon
+	if cmd.buttons != InputCmd.ALL_BUTTONS or cmd.weapon != InputCmd.MAX_WEAPON_SLOT:
+		return "unknown button bits or weapon slot %d were kept" % cmd.weapon
 	return ""
 
 
