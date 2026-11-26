@@ -453,10 +453,12 @@ func _add_participant(id: int, kind: String) -> Dictionary:
 ## 팀 스폰 중 살아 있는 적에게서 가장 먼 곳을 고른다. 적이 없으면 팀별로 정해진 자리를 쓴다.
 func _pick_spawn(team: int, self_id: int) -> int:
 	# 팀별 스폰이 정해진 맵에서는 자기 진영에서만 고른다.
+	# 팀 스폰이 없는 맵(테스트용 평지)은 팀 번호로 자리가 정해져 결과가 매번 같다.
 	var candidates: Array = range(int(_map.call("spawn_count")))
+	var best: int = candidates[team % candidates.size()]
 	if _map.has_method("spawn_indices_for"):
 		candidates = _map.call("spawn_indices_for", team)
-	var best: int = candidates[(self_id + team) % candidates.size()]
+		best = candidates[self_id % candidates.size()]
 	var best_distance := -1.0
 	for index: int in candidates:
 		var spot: Transform3D = _map.call("spawn_point", index)
