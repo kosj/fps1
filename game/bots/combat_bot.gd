@@ -16,6 +16,7 @@ const HOLD_RADIUS := 1.2
 const SCAN_SPEED := 0.9
 ## 지키는 지점에서 이보다 멀어지면 싸우는 중에도 돌아간다(m).
 const HOLD_LEASH := 2.5
+const PATH_NODE_RADIUS := 1.5
 
 ## 난이도 조절 값. 사람이 직접 상대해 보며 조정해야 하는 잠정치다.
 var reaction_time := 0.5
@@ -29,6 +30,8 @@ var weapon_slot := 0
 ## 지켜야 할 지점(점령 중인 거점). has_hold가 켜져 있으면 교전 중에도 이 근처를 벗어나지 않는다.
 var has_hold := false
 var hold_point := Vector3.ZERO
+## 맵의 이동 그래프(NavGraph). 있으면 목적지까지 그래프를 따라가고, 없으면 직선으로 간다.
+var navigator: RefCounted = null
 
 var _rng := RandomNumberGenerator.new()
 var _yaw := 0.0
@@ -44,6 +47,8 @@ var _stuck_time := 0.0
 var _jump_ticks := 0
 var _strafe := 1.0
 var _strafe_left := 0.0
+var _path: Array = []
+var _path_goal := Vector3.INF
 
 
 func _init(p_seed: int = 1, start_yaw: float = 0.0) -> void:
@@ -137,7 +142,16 @@ func _roam(cmd: InputCmd, delta: float, feet: Vector3, speed: float, nav_points:
 		_pitch = move_toward(_pitch, 0.0, delta)
 		return
 
-	var to_destination := destination - feet
+	var target := destination
+	if navigator != null:
+		if _path.is_empty() or _path_goal != destination:
+			_path = navigator.call("path", feet, destination)
+			_path_goal = destination
+		while _path.size() > 1 and _flat_distance(feet, _path[0]) < PATH_NODE_RADIUS:
+			_path.pop_front()
+		target = _path[0]
+
+	var to_destination := target - feet
 	_turn_toward(atan2(-to_destination.x, -to_destination.z), 0.0, delta)
 	cmd.move.y = -1.0
 	if _flat_distance(feet, destination) > 12.0:
@@ -153,6 +167,7 @@ func _roam(cmd: InputCmd, delta: float, feet: Vector3, speed: float, nav_points:
 	if _stuck_time > 1.6:
 		_stuck_time = 0.0
 		_chase_left = 0.0
+		_path.clear()
 		_pick_waypoint(feet, nav_points)
 
 

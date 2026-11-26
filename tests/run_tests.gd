@@ -12,6 +12,7 @@ const SUITES := {
 	"weapons": preload("res://tests/test_weapons.gd"),
 	"domination": preload("res://tests/test_domination.gd"),
 	"touch": preload("res://tests/test_touch.gd"),
+	"nav": preload("res://tests/test_nav.gd"),
 }
 
 
