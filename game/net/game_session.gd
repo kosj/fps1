@@ -34,6 +34,7 @@ const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
 const ZoneMarker := preload("res://game/match/zone_marker.gd")
 const Settings := preload("res://game/core/settings.gd")
+const SessionReport := preload("res://game/net/session_report.gd")
 const MainMenu := preload("res://game/ui/main_menu.gd")
 const PauseMenu := preload("res://game/ui/pause_menu.gd")
 ## 이 인자가 하나라도 있으면 메뉴 없이 바로 시작한다(서버, 자동 테스트, 웹 주소창 접속).
@@ -952,49 +953,12 @@ func _finish() -> void:
 	_exit_after = 0.0
 	if _remote_max_x > _remote_min_x:
 		stats["remote_travel"] = _remote_max_x - _remote_min_x
-	var failures := PackedStringArray()
-	if mode == Mode.CLIENT:
-		if not stats["connected"]:
-			failures.append("never connected")
-		if int(stats["snapshots"]) < 30:
-			failures.append("received only %d snapshots" % int(stats["snapshots"]))
-	if _args.has("expect-players"):
-		var wanted := int(_args["expect-players"])
-		if int(stats["peak_players"]) < wanted:
-			failures.append("expected %d players, saw %d" % [wanted, int(stats["peak_players"])])
-	if _args.has("expect-kills"):
-		var wanted_kills := int(_args["expect-kills"])
-		if int(stats["total_kills"]) < wanted_kills:
-			failures.append("expected %d kills, saw %d" % [wanted_kills, int(stats["total_kills"])])
-	if _args.has("expect-zone-captures"):
-		var wanted_captures := int(_args["expect-zone-captures"])
-		if int(stats["zone_captures"]) < wanted_captures:
-			failures.append(
-				"expected %d zone captures, saw %d" % [wanted_captures, int(stats["zone_captures"])]
-			)
-	if _args.has("max-corrections"):
-		var allowed := int(_args["max-corrections"])
-		if int(stats["corrections"]) > allowed:
-			failures.append("%d prediction corrections (limit %d)" % [stats["corrections"], allowed])
-	if _args.has("expect-hit-ratio"):
-		var wanted_ratio := float(_args["expect-hit-ratio"])
-		var shots := int(stats["shots"])
-		var ratio := float(stats["hits"]) / maxf(float(shots), 1.0)
-		if shots < 10 or ratio < wanted_ratio:
-			failures.append("hit ratio %.2f over %d shots (wanted %.2f)" % [ratio, shots, wanted_ratio])
-	if _args.has("max-hit-ratio"):
-		var limit := float(_args["max-hit-ratio"])
-		var ratio := float(stats["hits"]) / maxf(float(stats["shots"]), 1.0)
-		if ratio > limit:
-			failures.append("hit ratio %.2f is above %.2f" % [ratio, limit])
-	if _args.has("expect-remote-moving") and float(stats["remote_travel"]) < 2.0:
-		failures.append("remote player moved only %.2f m on screen" % float(stats["remote_travel"]))
-
 	var role := "local"
 	if mode == Mode.SERVER:
 		role = "server"
 	elif mode == Mode.CLIENT:
 		role = "client:%s" % str(_args.get("bot", "human"))
+	var failures := SessionReport.check(mode == Mode.CLIENT, _args, stats)
 	print("NETSTATS %s %s" % [role, JSON.stringify(stats)])
 	for failure in failures:
 		printerr("NETTEST FAIL %s: %s" % [role, failure])
