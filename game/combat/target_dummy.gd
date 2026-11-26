@@ -62,7 +62,7 @@ func _process(delta: float) -> void:
 func _set_standing(standing: bool) -> void:
 	visible = standing
 	for part in _parts:
-		part.collision_layer = 1 if standing else 0
+		part.collision_layer = Hitbox.LAYER if standing else 0
 
 
 func _add_part(center: Vector3, size: Vector3, is_head: bool) -> void:

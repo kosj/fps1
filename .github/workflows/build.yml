@@ -68,6 +68,12 @@ jobs:
           ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn 2>&1 | tee smoke.log
           ! grep -q "SCRIPT ERROR" smoke.log
 
+      - name: Run network test (server + 2 bot clients, 50 ms delay each way)
+        run: GODOT=~/godot/godot tests/net/run_net_test.sh lagcomp
+
+      - name: Run network test with lag compensation off (must mostly miss)
+        run: GODOT=~/godot/godot PORT=7789 tests/net/run_net_test.sh nolagcomp
+
       - name: Export Windows
         run: |
           mkdir -p build/windows

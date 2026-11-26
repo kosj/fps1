@@ -29,6 +29,16 @@ const DUMMIES := [
 	Vector3(4.0, 0.0, -60.0),
 ]
 
+## 스폰 지점. 각 항목은 [위치, 바라보는 방향(yaw, 도)].
+const SPAWNS := [
+	[Vector3(0.0, 0.1, 0.0), 0.0],
+	[Vector3(0.0, 0.1, -32.0), 180.0],
+	[Vector3(-12.0, 0.1, -16.0), -90.0],
+	[Vector3(12.0, 0.1, -16.0), 90.0],
+	[Vector3(-10.0, 0.1, 2.0), -30.0],
+	[Vector3(10.0, 0.1, -30.0), 150.0],
+]
+
 @onready var _sun: DirectionalLight3D = $Sun
 
 
@@ -42,12 +52,21 @@ func _ready() -> void:
 	ledge_material.albedo_color = Color(0.35, 0.5, 0.65)
 	for ledge: Array in LEDGES:
 		_add_box(ledge[0], ledge[1], ledge_material)
+
+
+## 세션이 플레이어를 놓을 자리. 인원이 스폰 수보다 많으면 처음부터 다시 쓴다.
+func spawn_point(index: int) -> Transform3D:
+	var spawn: Array = SPAWNS[index % SPAWNS.size()]
+	var facing := Basis.from_euler(Vector3(0.0, deg_to_rad(spawn[1]), 0.0))
+	return Transform3D(facing, spawn[0])
+
+
+## 혼자 연습할 때만 사격 더미를 세운다. 네트워크 대전에서는 상태를 동기화하지 않으므로 두지 않는다.
+func spawn_offline_targets() -> void:
 	for spot: Vector3 in DUMMIES:
 		var dummy := TargetDummy.new()
 		dummy.position = spot
 		add_child(dummy)
-	if OS.has_feature("dedicated_server"):
-		print("FPS1 dedicated server build (no networking yet)")
 
 
 func _add_box(center: Vector3, size: Vector3, material: Material) -> void:
