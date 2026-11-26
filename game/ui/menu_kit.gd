@@ -15,7 +15,7 @@ static func label(text: String, font_size: int) -> Label:
 static func button(text: String) -> Button:
 	var node := Button.new()
 	node.text = text
-	node.custom_minimum_size = Vector2(320.0, 48.0)
+	node.custom_minimum_size = Vector2(320.0, 42.0)
 	node.add_theme_font_size_override("font_size", 20)
 	return node
 
@@ -30,7 +30,7 @@ static func centered_column(layer: CanvasLayer, background: Color) -> VBoxContai
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	shade.add_child(center)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 14)
+	column.add_theme_constant_override("separation", 10)
 	center.add_child(column)
 	return column
 
@@ -39,7 +39,7 @@ static func centered_column(layer: CanvasLayer, background: Color) -> VBoxContai
 static func sensitivity_row(on_change: Callable) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
-	var caption := label("Mouse sensitivity", 16)
+	var caption := label("Mouse sensitivity", 18)
 	row.add_child(caption)
 	var slider := HSlider.new()
 	slider.min_value = Settings.MIN_SENSITIVITY
@@ -49,12 +49,39 @@ static func sensitivity_row(on_change: Callable) -> HBoxContainer:
 	slider.custom_minimum_size = Vector2(170.0, 24.0)
 	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(slider)
-	var readout := label("%.2f" % slider.value, 16)
+	var readout := label("%.2f" % slider.value, 18)
 	row.add_child(readout)
 	slider.value_changed.connect(
 		func(value: float) -> void: _apply_sensitivity(value, readout, on_change)
 	)
 	return row
+
+
+## 화면 글자와 버튼 크기를 조절하는 슬라이더 한 줄. 바꾸는 즉시 전체 UI에 적용하고 저장한다.
+static func ui_scale_row(tree: SceneTree) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.add_child(label("UI size", 18))
+	var slider := HSlider.new()
+	slider.min_value = Settings.MIN_UI_SCALE
+	slider.max_value = Settings.MAX_UI_SCALE
+	slider.step = 0.05
+	slider.value = Settings.ui_scale()
+	slider.custom_minimum_size = Vector2(170.0, 24.0)
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(slider)
+	var readout := label("%d%%" % int(round(slider.value * 100.0)), 18)
+	row.add_child(readout)
+	slider.value_changed.connect(
+		func(value: float) -> void: _apply_ui_scale(value, readout, tree)
+	)
+	return row
+
+
+static func _apply_ui_scale(value: float, readout: Label, tree: SceneTree) -> void:
+	readout.text = "%d%%" % int(round(value * 100.0))
+	Settings.write(Settings.UI_SCALE, value)
+	tree.root.content_scale_factor = value
 
 
 static func _apply_sensitivity(value: float, readout: Label, on_change: Callable) -> void:

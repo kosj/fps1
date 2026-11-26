@@ -6,6 +6,9 @@ const SENSITIVITY := "input/sensitivity_scale"
 const BOT_COUNT := "match/bots"
 const SERVER_ADDRESS := "match/server_address"
 const GAME_MODE := "match/mode"
+const UI_SCALE := "ui/scale"
+const MIN_UI_SCALE := 0.8
+const MAX_UI_SCALE := 1.4
 const MIN_SENSITIVITY := 0.2
 const MAX_SENSITIVITY := 4.0
 
@@ -25,6 +28,10 @@ static func write(key: String, value: Variant) -> void:
 	var parts := key.split("/")
 	config.set_value(parts[0], parts[1], value)
 	config.save(PATH)
+
+
+static func ui_scale() -> float:
+	return clampf(float(read(UI_SCALE, 1.0)), MIN_UI_SCALE, MAX_UI_SCALE)
 
 
 static func sensitivity() -> float:

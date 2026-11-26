@@ -33,6 +33,7 @@ const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
 const ZoneMarker := preload("res://game/match/zone_marker.gd")
+const Settings := preload("res://game/core/settings.gd")
 const MainMenu := preload("res://game/ui/main_menu.gd")
 const PauseMenu := preload("res://game/ui/pause_menu.gd")
 ## 이 인자가 하나라도 있으면 메뉴 없이 바로 시작한다(서버, 자동 테스트, 웹 주소창 접속).
@@ -111,6 +112,7 @@ var _remote_max_x := -INF
 
 
 func _ready() -> void:
+	get_tree().root.content_scale_factor = Settings.ui_scale()
 	_parse_args()
 	_exit_after = float(_args.get("exit-after", "0"))
 	_lag_comp = not _args.has("no-lagcomp")

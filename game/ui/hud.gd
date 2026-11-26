@@ -41,12 +41,12 @@ func _ready() -> void:
 
 	_ammo_label = _make_label(root, 40, Control.PRESET_BOTTOM_RIGHT)
 	_ammo_label.offset_bottom = -MARGIN
-	_weapon_label = _make_label(root, 18, Control.PRESET_BOTTOM_RIGHT)
+	_weapon_label = _make_label(root, 22, Control.PRESET_BOTTOM_RIGHT)
 	_weapon_label.offset_bottom = -MARGIN - 52
 	_health_label = _make_label(root, 40, Control.PRESET_BOTTOM_LEFT)
 	_health_label.offset_bottom = -MARGIN
 	_health_label.offset_left = MARGIN
-	_score_label = _make_label(root, 20, Control.PRESET_CENTER_TOP)
+	_score_label = _make_label(root, 24, Control.PRESET_CENTER_TOP)
 	_score_label.offset_top = MARGIN
 	_score_label.offset_bottom = MARGIN + 28
 	_message_label = _make_label(root, 44, Control.PRESET_CENTER)
@@ -55,7 +55,7 @@ func _ready() -> void:
 	_zone_row = HBoxContainer.new()
 	_zone_row.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_zone_row.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_zone_row.offset_top = MARGIN + 34
+	_zone_row.offset_top = MARGIN + 38
 	_zone_row.add_theme_constant_override("separation", 28)
 	_zone_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_zone_row)
@@ -66,10 +66,10 @@ func _ready() -> void:
 	_feed.offset_right = -MARGIN
 	_feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_feed)
-	_notice_label = _make_label(root, 20, Control.PRESET_CENTER)
+	_notice_label = _make_label(root, 24, Control.PRESET_CENTER)
 	_notice_label.offset_top = 110
 	_notice_label.offset_bottom = 140
-	_status_label = _make_label(root, 20, Control.PRESET_CENTER)
+	_status_label = _make_label(root, 24, Control.PRESET_CENTER)
 	_status_label.offset_top = 60
 	_status_label.offset_bottom = 90
 	_hint_label = _make_label(root, 22, Control.PRESET_CENTER)
@@ -124,7 +124,7 @@ func add_feed_line(text: String, color: Color) -> void:
 	label.text = text
 	label.modulate = color
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_font_size_override("font_size", 22)
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.8))
 	label.add_theme_constant_override("outline_size", 4)
 	label.set_meta("left", FEED_TIME)
