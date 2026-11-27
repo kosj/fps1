@@ -33,6 +33,7 @@ const WeaponState := preload("res://game/weapons/weapon_state.gd")
 const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const Effects := preload("res://game/fx/effects.gd")
 const Authority := preload("res://game/net/authority.gd")
+const Connector := preload("res://game/net/connector.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -775,20 +776,12 @@ func _announce_kill(killer: int, victim: int, killer_team: int, headshot: bool) 
 
 
 func _start_client(address: String) -> void:
-	var peer := WebSocketMultiplayerPeer.new()
-	# https 페이지에서는 브라우저가 wss://만 허용하므로 전체 주소도 받는다.
-	var url := address if address.contains("://") else "ws://" + address
-	var error := peer.create_client(url)
-	if error != OK:
-		printerr("could not start connecting to %s (error %d)" % [address, error])
-		get_tree().quit(1)
-		return
-	multiplayer.multiplayer_peer = peer
-	multiplayer.connected_to_server.connect(_on_connected)
-	multiplayer.connection_failed.connect(_on_connection_lost.bind("connection failed"))
-	multiplayer.server_disconnected.connect(_on_connection_lost.bind("server closed the connection"))
 	mode = Mode.CLIENT
-	print("connecting to %s" % address)
+	var connector := Connector.new()
+	add_child(connector)
+	connector.connected.connect(_on_connected)
+	connector.failed.connect(_on_connection_lost)
+	connector.start(address)
 
 
 func _on_connected() -> void:
@@ -802,6 +795,10 @@ func _on_connection_lost(reason: String) -> void:
 	printerr("network: %s" % reason)
 	if _exit_after > 0.0:
 		_finish()
+	elif _menu == null and DisplayServer.get_name() != "headless":
+		# 사람이 하던 중이면 이유를 알려 주고 시작 화면으로 돌아간다.
+		MainMenu.notice = reason
+		_return_to_menu()
 
 
 func _client_resolve_shot(origin: Vector3, direction: Vector3) -> void:
