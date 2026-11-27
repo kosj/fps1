@@ -19,3 +19,4 @@ game/weapons/models/*.glb -filter -diff -merge -text
 # 1K 맵 텍스처도 LFS 없이 둔다(이 작업 환경에서 LFS 저장소로 올릴 수 없다).
 maps/textures/*.jpg -filter -diff -merge -text
 maps/props/*.glb -filter -diff -merge -text
+game/player/models/*.glb -filter -diff -merge -text
