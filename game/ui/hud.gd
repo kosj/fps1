@@ -6,6 +6,7 @@ const Crosshair := preload("res://game/ui/crosshair.gd")
 const MARGIN := 32
 const FEED_TIME := 5.0
 const FEED_LINES := 5
+const NARROW_WIDTH := 760.0
 ## 색은 아군 파랑, 적 빨강으로 보이므로(팀 이름과 무관) 점수판 머리글도 그 기준으로 쓴다.
 const SCORE_HEADERS := ["YOUR TEAM", "ENEMY"]
 
@@ -96,6 +97,11 @@ func set_health(health: float, max_health: float) -> void:
 	_health_label.text = "+ %d" % int(ceilf(health))
 	var low := health <= max_health * 0.35
 	_health_label.modulate = Color(1.0, 0.4, 0.3) if low else Color(1.0, 1.0, 1.0)
+
+
+## 화면이 좁은지(세로로 든 휴대폰). 좁으면 윗줄 문구를 짧게 쓴다.
+func is_narrow() -> bool:
+	return is_inside_tree() and get_viewport().get_visible_rect().size.x < NARROW_WIDTH
 
 
 func set_score(text: String) -> void:
