@@ -19,6 +19,8 @@ from mathutils import Matrix, Vector
 SIZES = {
     "container": [(4, 2.5, 1), (2, 2.5, 3), (3, 2.5, 1.5), (2, 2.5, 4)],
     "crate": [(2, 1.2, 2), (3, 1.2, 1.2), (3, 1.2, 1.5)],
+    "barrier": [(0.6, 1, 3), (3, 1, 0.6)],
+    "barrels": [(1.4, 1, 1.4)],
 }
 
 
@@ -42,6 +44,36 @@ class Builder:
         index = self.slots.index(slot)
         for face in {f for v in verts for f in v.link_faces}:
             face.material_index = index
+
+    def prism(self, points, along, lo, hi, slot):
+        """단면 다각형 (가로, 높이)을 along 축("x" 또는 "z") 방향으로 lo~hi까지 돌출한다."""
+        def place(u, h, w):
+            # Godot (x, y, z) -> Blender (x, -z, y)
+            return (w, -u, h) if along == "x" else (u, -w, h)
+        a = [self.bm.verts.new(place(u, h, lo)) for u, h in points]
+        b = [self.bm.verts.new(place(u, h, hi)) for u, h in points]
+        faces = [self.bm.faces.new(a), self.bm.faces.new(list(reversed(b)))]
+        count = len(points)
+        for i in range(count):
+            j = (i + 1) % count
+            faces.append(self.bm.faces.new((a[j], a[i], b[i], b[j])))
+        for face in faces:
+            face.material_index = self.slots.index(slot)
+
+    def drum(self, x, z, radius, y0, y1, slot, segments=14):
+        """세로로 선 원통."""
+        ring0, ring1 = [], []
+        for i in range(segments):
+            t = 2 * math.pi * i / segments
+            px, pz = x + math.cos(t) * radius, z + math.sin(t) * radius
+            ring0.append(self.bm.verts.new((px, -pz, y0)))
+            ring1.append(self.bm.verts.new((px, -pz, y1)))
+        faces = [self.bm.faces.new(ring0), self.bm.faces.new(list(reversed(ring1)))]
+        for i in range(segments):
+            j = (i + 1) % segments
+            faces.append(self.bm.faces.new((ring0[j], ring0[i], ring1[i], ring1[j])))
+        for face in faces:
+            face.material_index = self.slots.index(slot)
 
     def finish(self, name):
         mesh = bpy.data.meshes.new(name)
@@ -150,6 +182,42 @@ def crate(size):
     return b
 
 
+def barrier(size):
+    """콘크리트 방호벽: 아래가 넓고 위가 좁은 단면을 길이 방향으로 돌출한다."""
+    b = Builder()
+    along = "z" if size[2] > size[0] else "x"
+    width = min(size[0], size[2]) / 2
+    length = max(size[0], size[2]) / 2
+    h = size[1]
+    top = width * 0.38
+    mid = width * 0.5
+    profile = [(-width, 0), (width, 0), (width, h * 0.14), (mid, h * 0.36), (top, h),
+               (-top, h), (-mid, h * 0.36), (-width, h * 0.14)]
+    b.prism(profile, along, -length, length, "panel")
+    # 양 끝의 연결 홈과 지게차 구멍 자리를 어두운 띠로 표시한다.
+    for end in (-1, 1):
+        w = end * (length - 0.04)
+        lo, hi = sorted((w, w + end * 0.045))
+        band = [(-top * 0.9, h * 0.4), (top * 0.9, h * 0.4), (top * 0.9, h * 0.92), (-top * 0.9, h * 0.92)]
+        b.prism(band, along, lo, hi, "frame")
+    return b
+
+
+def barrels(size):
+    """드럼통 네 개. 충돌 상자를 채우도록 2x2로 세운다."""
+    b = Builder()
+    x, z = size[0] / 2, size[2] / 2
+    h = size[1]
+    radius = min(x, z) / 2 - 0.01
+    for i, (sx, sz) in enumerate(((-1, -1), (1, -1), (-1, 1), (1, 1))):
+        cx, cz = sx * x / 2, sz * z / 2
+        top = h - (0.06 if i == 3 else 0.0)
+        b.drum(cx, cz, radius, 0.0, top, "panel")
+        for level in (0.0, top * 0.33, top * 0.66, top - 0.03):
+            b.drum(cx, cz, radius + 0.012, level, level + 0.03, "frame")
+    return b
+
+
 def file_name(kind, size):
     return "%s_%d_%d_%d" % (kind, round(size[0] * 100), round(size[1] * 100), round(size[2] * 100))
 
@@ -157,7 +225,7 @@ def file_name(kind, size):
 def main():
     out_dir = sys.argv[sys.argv.index("--") + 1]
     os.makedirs(out_dir, exist_ok=True)
-    makers = {"container": container, "crate": crate}
+    makers = {"container": container, "crate": crate, "barrier": barrier, "barrels": barrels}
     for kind, sizes in SIZES.items():
         for size in sizes:
             bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -167,7 +235,10 @@ def main():
             obj.data.transform(Matrix.Translation((0, 0, -size[1] / 2)))
             obj.select_set(True)
             bpy.context.view_layer.objects.active = obj
-            bpy.ops.object.shade_flat()
+            if kind == "barrels":
+                bpy.ops.object.shade_smooth_by_angle(angle=math.radians(40))
+            else:
+                bpy.ops.object.shade_flat()
             path = os.path.join(out_dir, name + ".glb")
             bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True,
                                       export_yup=True)

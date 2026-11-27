@@ -8,12 +8,16 @@ const TEXTURE_DIR := "res://maps/textures/"
 ## 컨테이너는 회색으로 바꾼 색 텍스처에 색조를 곱해 여러 색을 낸다.
 const KINDS := {
 	"floor": ["asphalt_02", 0.25, Color(0.85, 0.85, 0.88)],
-	"wall": ["cracked_concrete_wall", 0.45, Color(0.62, 0.62, 0.64)],
+	"wall": ["cracked_concrete_wall", 0.55, Color(0.5, 0.5, 0.52)],
 	"container": ["container_side", 0.4, Color(0.36, 0.62, 0.42), "container_grey"],
 	"crate": ["plywood", 0.6, Color(0.95, 0.9, 0.8)],
 	"container_blue": ["container_side", 0.4, Color(0.25, 0.42, 0.75), "container_grey"],
 	"container_rust": ["container_side", 0.4, Color(0.72, 0.33, 0.2), "container_grey"],
 	"container_frame": ["container_side", 0.05, Color(0.42, 0.5, 0.45)],
+	"barrier": ["cracked_concrete_wall", 0.7, Color(0.5, 0.5, 0.5)],
+	"barrier_frame": ["cracked_concrete_wall", 0.7, Color(0.22, 0.22, 0.22)],
+	"barrels": ["", 1.0, Color(0.16, 0.3, 0.5)],
+	"barrels_frame": ["", 1.0, Color(0.09, 0.12, 0.18)],
 	"warehouse": ["corrugated_iron_02", 0.18, Color(0.72, 0.74, 0.76)],
 	"crate_frame": ["plywood", 0.9, Color(0.62, 0.52, 0.4)],
 }
@@ -29,6 +33,12 @@ static func material(kind: String) -> StandardMaterial3D:
 	var prefix: String = TEXTURE_DIR + str(spec[0])
 	var result := StandardMaterial3D.new()
 	result.albedo_color = spec[2]
+	if str(spec[0]) == "":
+		# 텍스처 없는 칠한 금속(드럼통).
+		result.roughness = 0.45
+		result.metallic = 0.4
+		_cache[kind] = result
+		return result
 	var color_prefix: String = TEXTURE_DIR + str(spec[3]) if spec.size() > 3 else prefix
 	result.albedo_texture = load(color_prefix + "_diff.jpg")
 	result.uv1_triplanar = true
