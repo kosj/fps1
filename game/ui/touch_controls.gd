@@ -32,7 +32,9 @@ var _weapon_steps := 0
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# 트리에 들어온 뒤에는 set_anchors_preset이 현재 크기(0)를 유지하도록 오프셋을 잡아,
+	# 버튼 위치의 기준인 size가 (0, 0)이 되고 버튼이 모두 화면 밖에 그려졌다. 오프셋까지 함께 맞춘다.
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
@@ -137,7 +139,7 @@ func _press(button: String) -> void:
 
 
 func _area() -> Vector2:
-	return size if is_inside_tree() else layout_size
+	return size if is_inside_tree() and size.x > 0.0 else layout_size
 
 
 ## 버튼 배치. 이름 -> [중심, 반지름, 글자].
