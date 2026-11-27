@@ -8,6 +8,7 @@
 script = ExtResource("1_data")
 model = ExtResource("2_model")
 shot_sound = ExtResource("3_shot")
+support_point = Vector3(0, -0.06, -0.22)
 sight_height = 0.08
 hide_when_aimed = false
 display_name = "Kestrel-9"

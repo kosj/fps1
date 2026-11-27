@@ -8,6 +8,7 @@
 script = ExtResource("1_data")
 model = ExtResource("2_model")
 shot_sound = ExtResource("3_shot")
+support_point = Vector3(0, -0.085, -0.3)
 sight_height = 0.075
 hide_when_aimed = true
 display_name = "LR-12"
