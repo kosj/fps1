@@ -36,6 +36,7 @@ const Authority := preload("res://game/net/authority.gd")
 const Connector := preload("res://game/net/connector.gd")
 const LaunchArgs := preload("res://game/core/launch_args.gd")
 const Catalog := preload("res://maps/catalog.gd")
+const Grenades := preload("res://game/combat/grenades.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -56,8 +57,6 @@ const SCORE_LIMIT := 30
 const MATCH_TIME := 300.0
 const INTERMISSION_TIME := 8.0
 const LOCAL_ID := 1
-const BOT_SIGHT_RANGE := 60.0
-const BOT_NEAR_RANGE := 10.0
 const MatchView := preload("res://game/net/match_view.gd")
 const Vitals := preload("res://game/match/vitals.gd")
 const SpawnPicker := preload("res://game/match/spawn_picker.gd")
@@ -68,6 +67,8 @@ static var _left_game := false
 var mode := Mode.LOCAL_MATCH
 var stats := {
 	"connected": false,
+	"grenades": 0,
+	"blast_hits": 0,
 	"score_rows": 0,
 	"snapshots": 0,
 	"corrections": 0,
@@ -112,8 +113,8 @@ var _last_local_health := Protocol.MAX_HEALTH
 ## 점령전일 때만 있다. 판정 권한이 있는 쪽이 갱신한다.
 var _domination: Domination
 var _view := MatchView.new()
+var _grenades := Grenades.new()
 var _difficulty := "normal"
-var _capture_check_left := 0.0
 # 클라이언트 전용
 var _seq := 0
 ## 아직 서버 확인을 받지 못한 입력. 각 항목은 [seq, 입력, 그 입력을 적용한 뒤의 예측 상태].
@@ -135,6 +136,8 @@ func _ready() -> void:
 	if not window.size_changed.is_connected(rescale):
 		window.size_changed.connect(rescale)
 	_args = LaunchArgs.parse()
+	add_child(_grenades)
+	_grenades.exploded.connect(_on_grenade_exploded)
 	if _left_game:
 		# 링크(?connect=)로 들어왔다가 나온 뒤에는 다시 자동 접속하지 않고 시작 화면을 보여 준다.
 		_args.erase("connect")
@@ -256,10 +259,8 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 func _add_pause_menu() -> void:
 	_pause = PauseMenu.new()
 	_pause.visible = false
-	_pause.resume_requested.connect(_resume)
+	_pause.local_player = local_player
 	_pause.menu_requested.connect(_return_to_menu)
-	_pause.sensitivity_changed.connect(_on_sensitivity_changed)
-	_pause.touch_toggled.connect(_on_touch_toggled)
 	add_child(_pause)
 
 
@@ -276,43 +277,6 @@ func _score_limit() -> int:
 
 func _apply_quality() -> void:
 	Settings.apply_quality(_map, get_viewport())
-
-
-func _resume() -> void:
-	if _local != null and _local.touch != null:
-		_local.set_paused(false)
-	else:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-		_capture_check_left = 0.4
-
-
-func _on_touch_toggled(enabled: bool) -> void:
-	if _local == null:
-		return
-	if enabled:
-		_local.set_touch(true)
-		_local.set_paused(true)
-	else:
-		_local.set_touch(false)
-
-
-## 계속하기를 눌렀는데도 포인터 잠금이 되지 않고 터치 화면이 있으면, 휴대폰으로 보고 터치 조작을 켠다.
-## 기기 판단이 틀렸을 때 일시 정지 화면에 갇히지 않게 하는 안전장치다.
-func _check_capture_fallback(delta: float) -> void:
-	if _capture_check_left <= 0.0:
-		return
-	_capture_check_left -= delta
-	if _capture_check_left > 0.0 or _local == null or _local.touch != null:
-		return
-	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
-	if not captured and DisplayServer.is_touchscreen_available():
-		_local.set_touch(true)
-		_local.set_paused(false)
-
-
-func _on_sensitivity_changed(value: float) -> void:
-	if _local != null:
-		_local.set_sensitivity(value)
 
 
 func _return_to_menu() -> void:
@@ -338,6 +302,7 @@ func _physics_process(delta: float) -> void:
 		_:
 			if _local != null:
 				_local.simulate(_next_local_cmd(delta), delta)
+	_grenades.tick(delta)
 	if _local != null and _local.touch != null:
 		_local.assist_targets = Authority.assist_targets(
 			_local, _avatars if mode == Mode.CLIENT else _peers, mode == Mode.CLIENT, _view.own_team
@@ -347,7 +312,6 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
-	_check_capture_fallback(delta)
 	if _pause != null:
 		# 접속 중에는 접속 안내 화면(BACK 버튼)이 대신한다.
 		_pause.visible = _local != null and not _local.input_active()
@@ -454,6 +418,7 @@ func _add_participant(id: int, kind: String) -> Dictionary:
 		player.require_mouse_capture = false
 	player.weapon.resolve_shot = _resolve_shot.bind(id)
 	player.weapon.fired.connect(_on_participant_fired.bind(id))
+	player.grenade_thrown.connect(_on_grenade_thrown.bind(id))
 	var entry := {
 		"fired": false,
 		"since_damage": 999.0,
@@ -555,7 +520,7 @@ func _tick_authority(delta: float) -> void:
 				_shot_view_tick = float(_tick)
 				var cmd := InputCmd.new()
 				if not frozen and player.alive:
-					cmd = _bot_cmd(id, entry, delta)
+					cmd = Authority.bot_cmd(_peers, id, _domination, _nav_points, delta)
 				player.simulate(cmd, delta)
 			_:
 				_shot_view_tick = float(_tick)
@@ -591,26 +556,6 @@ func _simulate_peer(entry: Dictionary, delta: float, frozen: bool) -> void:
 			cmd.move = Vector2.ZERO
 			cmd.buttons = 0
 		entry["player"].simulate(cmd, delta)
-
-
-## 봇에게 보이는 적을 골라 입력을 만든다. 가까운 적은 방향과 무관하게, 먼 적은 시야각 안에서만 본다.
-func _bot_cmd(id: int, entry: Dictionary, delta: float) -> InputCmd:
-	var player = entry["player"]
-	var eye: Vector3 = player.eye_position()
-	var visible := Authority.visible_enemies(_peers, id, BOT_SIGHT_RANGE, BOT_NEAR_RANGE)
-	var bot: CombatBot = entry["bot"]
-	var goals := _nav_points
-	bot.has_hold = false
-	if _domination != null:
-		var team := int(entry["team"])
-		goals = _domination.objectives_for(team, player.global_position)
-		var hold := _domination.hold_zone_for(team, player.global_position)
-		if hold >= 0:
-			bot.has_hold = true
-			bot.hold_point = _domination.centers[hold]
-	return bot.make_cmd(
-		delta, eye, player.global_position, player.horizontal_speed(), visible, goals
-	)
 
 
 ## 제한 시간과 점수를 확인해 판을 끝내고, 잠시 뒤 새 판을 시작한다.
@@ -671,6 +616,7 @@ func _respawn(id: int, entry: Dictionary) -> void:
 	player.move_state = 0
 	player.crouching = false
 	player.weapon.reset()
+	player.grenades = Grenades.PER_LIFE
 	entry["protected"] = Vitals.SPAWN_PROTECTION
 	entry["since_damage"] = 999.0
 	(entry["history"] as Array).clear()
@@ -688,6 +634,7 @@ func _send_snapshots() -> void:
 			player.health, player.alive, player.weapon.state.ammo, entry["kills"], entry["deaths"],
 			entry["team"], _team_scores[0], _team_scores[1], _time_left, _intermission_left > 0.0,
 			player.weapon.slot, _domination.state() if _domination != null else [],
+			player.grenades,
 		]
 		_rpc_snapshot.rpc_id(id, _tick, entry["last_seq"], player.capture_state(), status, others)
 
@@ -739,9 +686,16 @@ func _resolve_shot(origin: Vector3, direction: Vector3, shooter_id: int) -> void
 		return
 
 	stats["server_hits"] += 1
-	var target_entry: Dictionary = _peers[best_id]
-	var target = target_entry["player"]
 	var amount: float = WeaponState.damage_at(shooter.weapon.data, best_distance, best_headshot)
+	_apply_damage(shooter_id, best_id, amount, best_headshot, origin + direction * best_distance)
+
+
+## 피해를 주고, 죽으면 점수와 킬 알림까지 처리한다. 총과 수류탄이 함께 쓴다.
+func _apply_damage(shooter_id: int, target_id: int, amount: float, headshot: bool, at: Vector3) -> void:
+	var shooter_entry: Dictionary = _peers[shooter_id]
+	var shooter = shooter_entry["player"]
+	var target_entry: Dictionary = _peers[target_id]
+	var target = target_entry["player"]
 	target.health = maxf(target.health - amount, 0.0)
 	target_entry["since_damage"] = 0.0
 	var killed: bool = target.health <= 0.0
@@ -749,21 +703,40 @@ func _resolve_shot(origin: Vector3, direction: Vector3, shooter_id: int) -> void
 		target.alive = false
 		target_entry["respawn"] = Protocol.RESPAWN_TIME
 		target_entry["deaths"] = int(target_entry["deaths"]) + 1
-		shooter_entry["kills"] = int(shooter_entry["kills"]) + 1
+		if shooter_id != target_id:
+			shooter_entry["kills"] = int(shooter_entry["kills"]) + 1
+			if _intermission_left <= 0.0 and _domination == null:
+				_team_scores[int(shooter_entry["team"])] += 1
 		stats["total_kills"] += 1
-		if _intermission_left <= 0.0 and _domination == null:
-			_team_scores[int(shooter_entry["team"])] += 1
-		_announce_kill(shooter_id, best_id, int(shooter_entry["team"]), best_headshot)
+		_announce_kill(shooter_id, target_id, int(shooter_entry["team"]), headshot)
 	if str(target_entry["kind"]) == "peer":
-		_rpc_damaged.rpc_id(best_id, shooter.global_position)
+		_rpc_damaged.rpc_id(target_id, shooter.global_position)
 	elif str(target_entry["kind"]) == "local":
 		target.show_damage_from(shooter.global_position)
-	var hit_point := origin + direction * best_distance
+	if shooter_id == target_id:
+		return
 	if str(shooter_entry["kind"]) == "peer":
-		_rpc_hit.rpc_id(shooter_id, best_headshot, killed, hit_point)
+		_rpc_hit.rpc_id(shooter_id, headshot, killed, at)
 	elif str(shooter_entry["kind"]) == "local":
-		shooter.show_hit(best_headshot, killed)
-		Effects.hit_puff(self, hit_point)
+		shooter.show_hit(headshot, killed)
+		Effects.hit_puff(self, at)
+
+
+## 수류탄: 던진 사실을 모두에게 알리고, 터지면 반경 안의 적(과 던진 사람)에게 피해를 준다.
+func _on_grenade_thrown(origin: Vector3, direction: Vector3, id: int) -> void:
+	_grenades.throw(id, origin, direction)
+	stats["grenades"] += 1
+	for peer_id: int in _peers:
+		if str(_peers[peer_id]["kind"]) == "peer":
+			_rpc_grenade.rpc_id(peer_id, origin, direction)
+
+
+func _on_grenade_exploded(owner_id: int, at: Vector3) -> void:
+	if mode == Mode.CLIENT or not _peers.has(owner_id):
+		return
+	for hit: Array in Authority.blast_hits(_peers, owner_id, at):
+		stats["blast_hits"] += 1
+		_apply_damage(owner_id, hit[0], hit[1], false, hit[2])
 
 
 func _announce_kill(killer: int, victim: int, killer_team: int, headshot: bool) -> void:
@@ -872,6 +845,11 @@ func _rpc_damaged(from: Vector3) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
+func _rpc_grenade(origin: Vector3, direction: Vector3) -> void:
+	_grenades.throw(0, origin, direction)
+
+
+@rpc("authority", "call_remote", "reliable")
 func _rpc_map(map_name: String) -> void:
 	_change_map(map_name)
 
@@ -923,6 +901,8 @@ func _apply_snapshot(
 	if _local == null:
 		return
 	_local.apply_net_status(float(status[0]), bool(status[1]), int(status[2]), int(status[10]))
+	if _local.grenades != int(status[12]):
+		_local.grenades = int(status[12])
 	_view.show_match(
 		_local.hud,
 		[status[5], status[6], status[7], status[8], status[9], status[3], status[4], status[1]]

@@ -117,6 +117,53 @@ static func impact(parent: Node, point: Vector3, normal: Vector3) -> Node3D:
 	return root
 
 
+## 수류탄 폭발: 번쩍이는 빛과 불꽃, 튀는 불티, 조금 뒤에 피어오르는 연기.
+static func explosion(parent: Node, point: Vector3) -> void:
+	if not parent.is_inside_tree():
+		return
+	# 밝은 배경에서는 더하기 혼합이 거의 보이지 않아, 불꽃은 불투명에 가까운 밝은 색으로 그린다.
+	var fire := _unshaded(Color(1.0, 0.5, 0.12, 1.0), false)
+	fire.albedo_texture = glow_texture()
+	fire.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	fire.render_priority = 1
+	# 불덩이가 바닥에 반쯤 묻히지 않게 폭발 지점보다 위에 그린다.
+	var at := point + Vector3.UP * 0.9
+	var core := fire.duplicate() as StandardMaterial3D
+	core.albedo_color = Color(1.0, 0.95, 0.72, 1.0)
+	core.render_priority = 2
+	_blast_part(parent, at, _burst(core, 6, 1.8, 1.5, 0.25, 0.96, Vector3.ZERO))
+	_blast_part(parent, at, _burst(fire, 12, 3.2, 3.5, 0.4, 0.96, Vector3.ZERO))
+	_blast_part(parent, at, _burst(fire, 26, 0.22, 16.0, 0.7, 0.96, Vector3(0, -12.0, 0)))
+	# (폭발성 1.0이면 입자가 수명만큼 늦게 나와서 0.96을 쓴다.)
+	# 연기는 섬광이 보인 뒤에 만든다. 같이 나오면 한 점에 겹친 연기가 불꽃을 덮는다.
+	parent.get_tree().create_timer(0.15).timeout.connect(_blast_smoke.bind(parent, at))
+	var light := OmniLight3D.new()
+	light.light_color = Color(1.0, 0.7, 0.35)
+	light.light_energy = 9.0
+	light.omni_range = 14.0
+	parent.add_child(light)
+	light.global_position = point + Vector3.UP * 0.6
+	var fade := parent.create_tween()
+	fade.tween_property(light, "light_energy", 0.0, 0.28)
+	fade.tween_callback(light.queue_free)
+
+
+static func _blast_smoke(parent: Node, at: Vector3) -> void:
+	if not is_instance_valid(parent) or not parent.is_inside_tree():
+		return
+	var smoke := _unshaded(Color(0.36, 0.34, 0.32, 0.34), false)
+	smoke.albedo_texture = glow_texture()
+	smoke.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	_blast_part(parent, at, _burst(smoke, 9, 2.4, 5.0, 2.2, 0.9, Vector3(0, 1.2, 0)))
+
+
+static func _blast_part(parent: Node, at: Vector3, part: CPUParticles3D) -> void:
+	part.spread = 180.0
+	parent.add_child(part)
+	part.global_position = at
+	parent.get_tree().create_timer(3.0).timeout.connect(part.queue_free)
+
+
 ## 사람에게 맞았을 때: 탄흔 없이 짧은 붉은 안개만 낸다.
 static func hit_puff(parent: Node, point: Vector3) -> void:
 	if not parent.is_inside_tree():

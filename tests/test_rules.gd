@@ -3,6 +3,8 @@ extends RefCounted
 const Vitals := preload("res://game/match/vitals.gd")
 const AimAssist := preload("res://game/player/aim_assist.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
+const Grenades := preload("res://game/combat/grenades.gd")
+const InputCmd := preload("res://game/player/input_cmd.gd")
 const EYE := Vector3(0.0, 1.6, 0.0)
 
 
@@ -79,4 +81,29 @@ func test_bot_difficulty_levels_are_ordered() -> String:
 		return "aim error should shrink from easy to hard"
 	if not (easy.turn_speed < normal.turn_speed and normal.turn_speed < hard.turn_speed):
 		return "turn speed should grow from easy to hard"
+	return ""
+
+
+func test_grenade_damage_falls_off_to_zero_at_the_radius() -> String:
+	if Grenades.damage_at(0.0) != Grenades.MAX_DAMAGE:
+		return "a grenade at point blank should deal full damage"
+	if Grenades.damage_at(Grenades.RADIUS) != 0.0 or Grenades.damage_at(Grenades.RADIUS + 5.0) != 0.0:
+		return "no damage at or beyond the radius"
+	var previous := Grenades.MAX_DAMAGE
+	for step in range(1, 14):
+		var amount := Grenades.damage_at(step * 0.5)
+		if amount > previous:
+			return "damage went up with distance at %.1f m" % (step * 0.5)
+		previous = amount
+	if Grenades.damage_at(3.0) < 60.0 or Grenades.damage_at(3.0) >= 100.0 + 20.0:
+		return "damage at 3 m is %f" % Grenades.damage_at(3.0)
+	return ""
+
+
+func test_grenade_button_survives_the_network_format() -> String:
+	var cmd := InputCmd.new()
+	cmd.buttons = InputCmd.GRENADE | InputCmd.FIRE
+	var back: InputCmd = InputCmd.from_array(cmd.to_array())
+	if back == null or not back.has(InputCmd.GRENADE) or not back.has(InputCmd.FIRE):
+		return "the grenade button was lost in to_array / from_array"
 	return ""

@@ -15,6 +15,8 @@ static func check(is_client: bool, args: Dictionary, stats: Dictionary) -> Packe
 			failures.append("never received the scoreboard")
 	_at_least(failures, args, stats, "expect-players", "peak_players", "players")
 	_at_least(failures, args, stats, "expect-kills", "total_kills", "kills")
+	_at_least(failures, args, stats, "expect-grenades", "grenades", "grenades thrown")
+	_at_least(failures, args, stats, "expect-blast-hits", "blast_hits", "grenade hits")
 	_at_least(failures, args, stats, "expect-zone-captures", "zone_captures", "zone captures")
 	if args.has("max-corrections"):
 		var allowed := int(args["max-corrections"])

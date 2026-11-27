@@ -34,7 +34,7 @@ func _physics_process(_delta: float) -> void:
 			_expect(pause != null, "no pause menu was created")
 			if pause != null:
 				_expect(pause.get("resume_button") != null, "pause menu has no resume button")
-				pause.emit_signal("sensitivity_changed", 1.5)
+				pause.call("_on_sensitivity_changed", 1.5)
 		40:
 			var player: Node = _game.call("local_player")
 			var scale: float = player.get("sensitivity_scale")

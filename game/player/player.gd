@@ -7,6 +7,8 @@ extends CharacterBody3D
 ## 이동 수치와 계산은 MoveMath에 둔다.
 
 signal health_changed(health: float)
+## 수류탄을 던졌을 때. 판정 권한이 있는 쪽(서버, 로컬 대전)만 받아서 실제로 만든다.
+signal grenade_thrown(origin: Vector3, direction: Vector3)
 
 enum MoveState { NORMAL, SLIDING, MANTLING }
 
@@ -68,6 +70,12 @@ var require_mouse_capture := true
 ## 마우스 감도 배율. - 와 = 키로 조절하고 설정 파일에 저장한다.
 var sensitivity_scale := 1.0
 var weapon: WeaponController
+## 남은 수류탄. 클라이언트에서는 서버가 알려 주는 값으로 맞춘다.
+var grenades := 2:
+	set(value):
+		grenades = value
+		if hud != null:
+			hud.set_grenades(value)
 var view_model: ViewModel
 var hud: Hud
 ## 터치 조작. 터치 기기에서만 만들어진다.
@@ -99,6 +107,7 @@ var _button_actions := {
 	"fire": InputCmd.FIRE,
 	"aim": InputCmd.AIM,
 	"reload": InputCmd.RELOAD,
+	"grenade": InputCmd.GRENADE,
 }
 
 @onready var _head: Node3D = $Head
@@ -249,6 +258,9 @@ func simulate(cmd: InputCmd, delta: float, replay: bool = false) -> void:
 	_update_stance(delta)
 	if replay:
 		return
+	if (pressed & InputCmd.GRENADE) != 0 and grenades > 0 and move_state != MoveState.MANTLING:
+		grenades -= 1
+		grenade_thrown.emit(eye_position(), -_head.global_transform.basis.z)
 	weapon.tick(cmd, pressed, delta)
 	_update_footsteps(delta)
 

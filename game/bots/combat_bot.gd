@@ -48,6 +48,7 @@ var _jump_ticks := 0
 var _strafe := 1.0
 var _strafe_left := 0.0
 var _path: Array = []
+var _grenade_wait := 8.0
 var _path_goal := Vector3.INF
 
 
@@ -126,6 +127,11 @@ func _fight(cmd: InputCmd, delta: float, eye: Vector3, feet: Vector3, enemies: A
 	_turn_toward(wanted_yaw + _error.x, wanted_pitch + _error.y, delta)
 
 	var distance := feet.distance_to(target)
+	# 가끔, 적당한 거리의 적에게 수류탄을 던진다.
+	_grenade_wait -= delta
+	var throws := _grenade_wait <= 0.0 and distance > 8.0 and distance < 22.0 and _seen_time > 0.6
+	if throws:
+		_grenade_wait = _rng.randf_range(14.0, 28.0)
 	_strafe_left -= delta
 	if _strafe_left <= 0.0:
 		_strafe_left = _rng.randf_range(0.8, 2.0)
@@ -147,6 +153,8 @@ func _fight(cmd: InputCmd, delta: float, eye: Vector3, feet: Vector3, enemies: A
 	var off_target := absf(angle_difference(_yaw, wanted_yaw)) + absf(_pitch - wanted_pitch)
 	if _seen_time >= reaction_time and off_target <= fire_cone + _error.length():
 		cmd.buttons |= InputCmd.FIRE
+	if throws:
+		cmd.buttons |= InputCmd.GRENADE
 
 
 func _roam(cmd: InputCmd, delta: float, feet: Vector3, speed: float, nav_points: Array) -> void:

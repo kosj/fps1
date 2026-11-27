@@ -13,6 +13,8 @@ const SCORE_HEADERS := ["YOUR TEAM", "ENEMY"]
 var _crosshair: Crosshair
 var _ammo_label: Label
 var _weapon_label: Label
+var _weapon_name := ""
+var _grenades := 2
 var _status_label: Label
 var _hint_label: Label
 var _health_label: Label
@@ -281,7 +283,17 @@ func _process(delta: float) -> void:
 
 
 func set_weapon_name(weapon_name: String) -> void:
-	_weapon_label.text = weapon_name
+	_weapon_name = weapon_name
+	_show_weapon_line()
+
+
+func set_grenades(count: int) -> void:
+	_grenades = count
+	_show_weapon_line()
+
+
+func _show_weapon_line() -> void:
+	_weapon_label.text = "%s   G x%d" % [_weapon_name, _grenades]
 
 
 func set_reloading(reloading: bool) -> void:

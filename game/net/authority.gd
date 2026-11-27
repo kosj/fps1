@@ -5,6 +5,9 @@ extends RefCounted
 
 const HitMath := preload("res://game/combat/hit_math.gd")
 const Protocol := preload("res://game/net/net_protocol.gd")
+const Grenades := preload("res://game/combat/grenades.gd")
+const BOT_SIGHT_RANGE := 60.0
+const BOT_NEAR_RANGE := 10.0
 
 
 ## 봇 id가 볼 수 있는 적의 위치 목록. 시야각(가까우면 무시), 거리, 벽 가림을 따진다.
@@ -115,3 +118,49 @@ static func assist_targets(local, others: Dictionary, avatars: bool, own_team: i
 		if wall.is_empty() or eye.distance_to(wall["position"]) >= offset.length():
 			targets.append(chest)
 	return targets
+
+
+## 폭발에 맞는 참가자와 피해. 각 항목은 [id, 피해, 맞은 자리(가슴)].
+## 던진 사람 자신과 적만 맞고, 같은 팀은 맞지 않는다. 벽 뒤와 리스폰 보호 중인 사람은 제외한다.
+static func blast_hits(peers: Dictionary, owner_id: int, at: Vector3) -> Array:
+	var hits: Array = []
+	var owner_entry: Dictionary = peers[owner_id]
+	for id: int in peers:
+		var entry: Dictionary = peers[id]
+		var player = entry["player"]
+		if not player.alive or float(entry["protected"]) > 0.0:
+			continue
+		if id != owner_id and int(entry["team"]) == int(owner_entry["team"]):
+			continue
+		var chest: Vector3 = player.global_position + Vector3.UP * (0.7 if player.is_low() else 1.1)
+		var amount := Grenades.damage_at(at.distance_to(chest))
+		if amount <= 0.0:
+			continue
+		# 폭발 지점을 바닥에서 조금 띄워, 바닥의 수류탄이 낮은 턱에 가려지지 않게 한다.
+		var from := at + Vector3.UP * 0.3
+		var wall: Dictionary = player.weapon.world_ray(from, (chest - from).normalized(), 1)
+		if wall.is_empty() or from.distance_to(wall["position"]) >= from.distance_to(chest) - 0.3:
+			hits.append([id, amount, chest])
+	return hits
+
+
+## 봇의 이번 틱 입력. 보이는 적을 고르고(가까운 적은 방향과 무관하게, 먼 적은 시야각 안에서만),
+## 점령전이면 노릴 거점과 지킬 자리를 정해 준다. domination은 점령전이 아니면 null.
+static func bot_cmd(peers: Dictionary, id: int, domination, nav_points: Array, delta: float):
+	var entry: Dictionary = peers[id]
+	var player = entry["player"]
+	var visible := visible_enemies(peers, id, BOT_SIGHT_RANGE, BOT_NEAR_RANGE)
+	var bot = entry["bot"]
+	var goals := nav_points
+	bot.has_hold = false
+	if domination != null:
+		var team := int(entry["team"])
+		goals = domination.objectives_for(team, player.global_position)
+		var hold: int = domination.hold_zone_for(team, player.global_position)
+		if hold >= 0:
+			bot.has_hold = true
+			bot.hold_point = domination.centers[hold]
+	return bot.make_cmd(
+		delta, player.eye_position(), player.global_position, player.horizontal_speed(),
+		visible, goals
+	)
