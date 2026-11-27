@@ -15,6 +15,20 @@ const WALL_COLOR := "wall"
 const TALL_COLOR := "container"
 const LOW_COLOR := "crate"
 
+const CONTAINER_KINDS := ["container", "container_blue", "container_rust"]
+## 경기장 바깥의 창고 건물(보이기만 하고 충돌은 없다). [중심, 크기].
+const BACKDROP := [
+	[Vector3(-41.0, 5.0, -18.0), Vector3(18.0, 10.0, 34.0)],
+	[Vector3(-41.0, 4.0, 22.0), Vector3(18.0, 8.0, 30.0)],
+	[Vector3(41.0, 6.0, 12.0), Vector3(18.0, 12.0, 36.0)],
+	[Vector3(41.0, 4.0, -24.0), Vector3(18.0, 8.0, 24.0)],
+	[Vector3(-12.0, 5.5, -51.0), Vector3(36.0, 11.0, 18.0)],
+	[Vector3(22.0, 4.0, -51.0), Vector3(22.0, 8.0, 18.0)],
+	[Vector3(10.0, 5.0, 51.0), Vector3(40.0, 10.0, 18.0)],
+	[Vector3(-24.0, 3.5, 51.0), Vector3(20.0, 7.0, 18.0)],
+]
+const LANE_X := [-20.0, 0.0, 20.0]
+
 ## 절반(z > 0)의 구조물. 각 항목은 [중심, 크기, 재질 종류].
 const HALF_BOXES := [
 	# 통로를 나누는 벽
@@ -90,9 +104,22 @@ func _ready() -> void:
 	_add_box(Vector3(30.5, WALL_HEIGHT / 2.0, 0.0), Vector3(1.0, WALL_HEIGHT, 82.0), WALL_COLOR)
 	_add_box(Vector3(0.0, WALL_HEIGHT / 2.0, -40.5), Vector3(62.0, WALL_HEIGHT, 1.0), WALL_COLOR)
 	_add_box(Vector3(0.0, WALL_HEIGHT / 2.0, 40.5), Vector3(62.0, WALL_HEIGHT, 1.0), WALL_COLOR)
-	for box: Array in HALF_BOXES:
-		_add_box(box[0], box[1], box[2])
-		_add_box(_mirror(box[0]), box[1], box[2])
+	for index in HALF_BOXES.size():
+		var box: Array = HALF_BOXES[index]
+		var kind: String = box[2]
+		var other := kind
+		if kind == TALL_COLOR:
+			# 컨테이너는 색을 섞고, 넓은 것 일부는 2단으로 쌓는다(위 칸도 총알을 막는다).
+			kind = CONTAINER_KINDS[index % CONTAINER_KINDS.size()]
+			other = CONTAINER_KINDS[(index + 1) % CONTAINER_KINDS.size()]
+			var size: Vector3 = box[1]
+			if index % 2 == 0 and size.x * size.z >= 4.5:
+				var above := Vector3(0.0, size.y, 0.0)
+				_add_box(box[0] + above, size, other)
+				_add_box(_mirror(box[0]) + above, size, kind)
+		_add_box(box[0], box[1], kind)
+		_add_box(_mirror(box[0]), box[1], other)
+	_add_backdrop()
 
 
 func spawn_count() -> int:
@@ -169,3 +196,28 @@ func _add_box(center: Vector3, size: Vector3, kind: String) -> void:
 	body.add_child(visual)
 	body.add_child(collision)
 	add_child(body)
+
+
+## 경기장 밖 건물과 바닥 차선. 플레이에는 영향이 없는 꾸밈이다.
+func _add_backdrop() -> void:
+	for item: Array in BACKDROP:
+		var mesh := BoxMesh.new()
+		mesh.size = item[1]
+		mesh.material = Surfaces.material("warehouse")
+		var building := MeshInstance3D.new()
+		building.mesh = mesh
+		building.position = item[0]
+		add_child(building)
+	var paint := StandardMaterial3D.new()
+	paint.albedo_color = Color(0.78, 0.74, 0.5)
+	paint.roughness = 0.9
+	var dash := BoxMesh.new()
+	dash.size = Vector3(0.14, 0.01, 2.2)
+	dash.material = paint
+	for x: float in LANE_X:
+		for step in range(-7, 8):
+			var line := MeshInstance3D.new()
+			line.mesh = dash
+			line.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			line.position = Vector3(x, 0.006, step * 5.0)
+			add_child(line)

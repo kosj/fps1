@@ -10,3 +10,10 @@
 | plywood | https://polyhaven.com/a/plywood | 낮은 엄폐물(나무 상자) |
 
 `_diff` 색, `_nor` 노멀(OpenGL), `_arm` AO(R)·러프니스(G)·메탈릭(B).
+
+추가:
+
+| 파일 접두어 | 에셋 | 용도 |
+|---|---|---|
+| corrugated_iron_02 | https://polyhaven.com/a/corrugated_iron_02 | 경기장 밖 창고 건물 |
+| container_grey | container_side의 색 텍스처를 회색으로 바꾼 것 | 컨테이너 색 변형(초록·파랑·녹슨 빨강)의 바탕 |
