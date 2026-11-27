@@ -24,11 +24,11 @@ fi
 if [ "$VARIANT" = "prediction" ]; then
   # 달리기, 슬라이딩, 점프, 앉기를 섞은 이동을 80ms 지연에서 예측한다.
   # 정상은 접속 직후의 위치 맞춤 1회뿐이다. CI 러너가 잠깐 멈추면 입력이 늦게 도착해 1~2회 더 생기므로 4회까지 허용한다.
-  "$GODOT" --headless -- --server --port=$PORT --map=$MAP --exit-after=18 --expect-players=1 \
+  timeout 120 "$GODOT" --headless -- --server --port=$PORT --map=$MAP --exit-after=18 --expect-players=1 \
     > "$OUT/server.log" 2>&1 &
   SERVER_PID=$!
   sleep 3
-  "$GODOT" --headless -- --connect=127.0.0.1:$PORT --map=$MAP --bot=runner \
+  timeout 120 "$GODOT" --headless -- --connect=127.0.0.1:$PORT --map=$MAP --bot=runner \
     --net-delay-ms=80 --exit-after=13 --max-corrections=4 > "$OUT/runner.log" 2>&1 &
   RUNNER_PID=$!
   STATUS=0
@@ -45,14 +45,14 @@ if [ "$VARIANT" = "prediction" ]; then
   exit $STATUS
 fi
 
-"$GODOT" --headless -- $SERVER_FLAGS > "$OUT/server.log" 2>&1 &
+timeout 120 "$GODOT" --headless -- $SERVER_FLAGS > "$OUT/server.log" 2>&1 &
 SERVER_PID=$!
 sleep 3
-"$GODOT" --headless -- --connect=127.0.0.1:$PORT --map=$MAP --bot=strafer \
+timeout 120 "$GODOT" --headless -- --connect=127.0.0.1:$PORT --map=$MAP --bot=strafer \
   --net-delay-ms=50 --exit-after=12 --max-corrections=40 > "$OUT/strafer.log" 2>&1 &
 STRAFER_PID=$!
 sleep 1
-"$GODOT" --headless -- --connect=127.0.0.1:$PORT --map=$MAP --bot=shooter \
+timeout 120 "$GODOT" --headless -- --connect=127.0.0.1:$PORT --map=$MAP --bot=shooter \
   --net-delay-ms=50 --exit-after=10 --expect-remote-moving $SHOOTER_FLAGS > "$OUT/shooter.log" 2>&1 &
 SHOOTER_PID=$!
 

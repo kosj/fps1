@@ -73,33 +73,33 @@ jobs:
 
       - name: Run unit tests
         run: |
-          ~/godot/godot --headless --script res://tests/run_tests.gd 2>&1 | tee unit.log
+          timeout 300 ~/godot/godot --headless --script res://tests/run_tests.gd 2>&1 | tee unit.log
           ! grep -q "SCRIPT ERROR" unit.log
 
       - name: Run gameplay smoke test
         run: |
-          ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn 2>&1 | tee smoke.log
+          timeout 300 ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn 2>&1 | tee smoke.log
           ! grep -q "SCRIPT ERROR" smoke.log
 
       - name: Check the Depot map (spawns, navigation links, sightlines)
         run: |
-          ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/map_check.tscn 2>&1 | tee map.log
+          timeout 300 ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/map_check.tscn 2>&1 | tee map.log
           ! grep -q "SCRIPT ERROR" map.log
 
       - name: Run menu smoke test
         run: |
-          ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/menu_smoke.tscn 2>&1 | tee menu.log
+          timeout 300 ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/menu_smoke.tscn 2>&1 | tee menu.log
           ! grep -q "SCRIPT ERROR" menu.log
 
       - name: Run bot match (6 bots play team deathmatch for 60 simulated seconds)
         run: |
-          ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --exit-after=60 \
+          timeout 300 ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --exit-after=60 \
             --expect-kills=3 2>&1 | tee botmatch.log
           ! grep -q "SCRIPT ERROR" botmatch.log
 
       - name: Run domination bot match (bots must capture zones)
         run: |
-          ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --mode=dom \
+          timeout 300 ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --mode=dom \
             --exit-after=60 --expect-zone-captures=2 2>&1 | tee dom.log
           ! grep -q "SCRIPT ERROR" dom.log
 
