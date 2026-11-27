@@ -62,7 +62,18 @@ func _process(_delta: float) -> void:
 	var aimed := _step % 2 == 1
 	if _step > 0:
 		_save("%d_%s" % [(_step - 1) / 2 + 1, "ads" if (_step - 1) % 2 == 1 else "hip"])
+	if weapon == WEAPONS.size() and not aimed:
+		# 효과 확인용: 소총으로 쏘는 중의 화면. 화염은 한 프레임뿐이라 캡처용으로 길게 켠다.
+		Input.action_release("aim")
+		for action in WEAPONS:
+			Input.action_release(action)
+		Input.action_press(WEAPONS[0])
+		Input.action_press("fire")
+		get_tree().create_timer(0.6).timeout.connect(_hold_flash)
+		_step += 1
+		return
 	if weapon >= WEAPONS.size():
+		Input.action_release("fire")
 		get_tree().quit()
 		return
 	if aimed:
@@ -73,6 +84,12 @@ func _process(_delta: float) -> void:
 			Input.action_release(action)
 		Input.action_press(WEAPONS[weapon])
 	_step += 1
+
+
+func _hold_flash() -> void:
+	var view: Node = _player.get("view_model")
+	view.set("_flash_left", 30.0)
+	view.set("_eject_left", 30.0)
 
 
 func _save(name: String) -> void:
