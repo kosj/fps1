@@ -60,6 +60,9 @@ const MatchView := preload("res://game/net/match_view.gd")
 const Vitals := preload("res://game/match/vitals.gd")
 const SpawnPicker := preload("res://game/match/spawn_picker.gd")
 
+## 한 번이라도 경기에서 시작 화면으로 나왔는지. 화면을 다시 불러와도 남는다.
+static var _left_game := false
+
 var mode := Mode.LOCAL_MATCH
 var stats := {
 	"connected": false,
@@ -125,8 +128,13 @@ var _remote_max_x := -INF
 func _ready() -> void:
 	var window := get_tree().root
 	Settings.apply_ui_scale(window)
-	window.size_changed.connect(Settings.apply_ui_scale.bind(window))
+	var rescale := Settings.apply_ui_scale.bind(window)
+	if not window.size_changed.is_connected(rescale):
+		window.size_changed.connect(rescale)
 	_parse_args()
+	if _left_game:
+		# 링크(?connect=)로 들어왔다가 나온 뒤에는 다시 자동 접속하지 않고 시작 화면을 보여 준다.
+		_args.erase("connect")
 	_exit_after = float(_args.get("exit-after", "0"))
 	_lag_comp = not _args.has("no-lagcomp")
 	_delay_ticks = int(round(float(_args.get("net-delay-ms", "0")) * Protocol.TICK_RATE / 1000.0))
@@ -186,6 +194,9 @@ func _start_from_args() -> void:
 		_add_bots(int(_args.get("bots", "0")))
 	elif _args.has("connect"):
 		_start_client(str(_args["connect"]))
+		# 주소창의 ?connect= 링크로 바로 들어온 사람도 일시 정지 화면을 쓸 수 있어야 한다.
+		if DisplayServer.get_name() != "headless":
+			_add_pause_menu()
 	elif _args.has("range"):
 		mode = Mode.RANGE
 		if _map.has_method("spawn_offline_targets"):
@@ -218,6 +229,10 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 			_local = _add_participant(LOCAL_ID, "local")["player"]
 			_add_bots(int(options.get("bots", 5)))
 	_apply_quality()
+	_add_pause_menu()
+
+
+func _add_pause_menu() -> void:
 	_pause = PauseMenu.new()
 	_pause.visible = false
 	_pause.resume_requested.connect(_resume)
@@ -304,6 +319,7 @@ func _on_sensitivity_changed(value: float) -> void:
 
 
 func _return_to_menu() -> void:
+	_left_game = true
 	multiplayer.multiplayer_peer = null
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().reload_current_scene()
@@ -334,8 +350,8 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	_check_capture_fallback(delta)
 	if _pause != null:
-		# 접속이 끝나기 전(_local 없음)에도 메뉴로 돌아갈 수 있게 보여 준다.
-		_pause.visible = _local == null or not _local.input_active()
+		# 접속 중에는 접속 안내 화면(BACK 버튼)이 대신한다.
+		_pause.visible = _local != null and not _local.input_active()
 	if not _started or mode != Mode.CLIENT:
 		return
 	var render_tick := _render_tick + Engine.get_physics_interpolation_fraction()

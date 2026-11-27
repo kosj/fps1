@@ -199,6 +199,8 @@ func gather_cmd() -> InputCmd:
 	var cmd := InputCmd.new()
 	cmd.yaw = rotation.y
 	cmd.pitch = _head.rotation.x
+	# 일시 정지 중에도 들고 있는 무기는 그대로 둔다(0으로 두면 서버가 첫 무기로 바꿔 버린다).
+	cmd.weapon = _selected_slot
 	if not input_active():
 		return cmd
 	if touch != null:

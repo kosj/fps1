@@ -16,6 +16,8 @@ const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const ORBIT_RADIUS := 17.0
 const ORBIT_HEIGHT := 5.5
 const ORBIT_PERIOD := 90.0
+## 화면 높이가 이보다 낮으면(가로로 든 휴대폰) 메뉴를 두 줄로 나눠 스크롤 없이 보이게 한다.
+const SHORT_HEIGHT := 620.0
 
 ## 시작 화면에 한 번 보여 줄 알림(접속 실패 이유 등). 화면을 다시 불러와도 남도록 static이다.
 static var notice := ""
@@ -43,11 +45,21 @@ func _ready() -> void:
 		notice_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.45))
 		column.add_child(notice_label)
 		notice = ""
-	column.add_child(_spacer(6.0))
+	# 가로로 든 휴대폰: 왼쪽에 혼자 하기, 오른쪽에 온라인과 설정.
+	var left := column
+	var right := column
+	if get_viewport().get_visible_rect().size.y < SHORT_HEIGHT:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 36)
+		column.add_child(row)
+		left = _side_column(row)
+		right = _side_column(row)
+	else:
+		column.add_child(_spacer(6.0))
 
 	play_button = MenuKit.button("PLAY VS BOTS")
 	play_button.pressed.connect(_on_play)
-	column.add_child(play_button)
+	left.add_child(play_button)
 
 	var bots_row := HBoxContainer.new()
 	bots_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -63,7 +75,7 @@ func _ready() -> void:
 	mode_select.add_item("Domination")
 	mode_select.selected = 1 if str(Settings.read(Settings.GAME_MODE, "tdm")) == "dom" else 0
 	bots_row.add_child(mode_select)
-	column.add_child(bots_row)
+	left.add_child(bots_row)
 
 	var options_row := HBoxContainer.new()
 	options_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -80,12 +92,13 @@ func _ready() -> void:
 		func(enabled: bool) -> void: Settings.write(Settings.LOW_GRAPHICS, enabled)
 	)
 	options_row.add_child(low_graphics)
-	column.add_child(options_row)
+	left.add_child(options_row)
 
 	range_button = MenuKit.button("SHOOTING RANGE")
 	range_button.pressed.connect(func() -> void: start_requested.emit("range", {}))
-	column.add_child(range_button)
-	column.add_child(_spacer(4.0))
+	left.add_child(range_button)
+	if left == right:
+		column.add_child(_spacer(4.0))
 
 	address_edit = LineEdit.new()
 	var saved := str(Settings.read(Settings.SERVER_ADDRESS, DEFAULT_ADDRESS))
@@ -93,22 +106,22 @@ func _ready() -> void:
 	address_edit.placeholder_text = "host:port or wss://address"
 	address_edit.custom_minimum_size = Vector2(320.0, 38.0)
 	address_edit.add_theme_font_size_override("font_size", 18)
-	column.add_child(address_edit)
+	right.add_child(address_edit)
 	join_button = MenuKit.button("PLAY ONLINE")
 	join_button.pressed.connect(_on_join)
-	column.add_child(join_button)
-	column.add_child(_spacer(4.0))
+	right.add_child(join_button)
+	right.add_child(_spacer(4.0))
 
-	column.add_child(MenuKit.sensitivity_row(Callable()))
-	column.add_child(MenuKit.ui_scale_row(get_tree()))
-	column.add_child(MenuKit.touch_toggle(Callable()))
+	right.add_child(MenuKit.sensitivity_row(Callable()))
+	right.add_child(MenuKit.ui_scale_row(get_tree()))
+	right.add_child(MenuKit.touch_toggle(Callable()))
 	var device := "mobile" if Settings.is_mobile() else "desktop"
 	var info := "build %s  |  detected: %s" % [Settings.build_version(), device]
-	column.add_child(MenuKit.label(info, 14))
+	right.add_child(MenuKit.label(info, 14))
 	if not OS.has_feature("web"):
 		var quit_button := MenuKit.button("QUIT")
 		quit_button.pressed.connect(func() -> void: get_tree().quit())
-		column.add_child(quit_button)
+		right.add_child(quit_button)
 
 
 func _on_play() -> void:
@@ -161,6 +174,14 @@ func _build_backdrop() -> void:
 	_camera.fov = 60.0
 	backdrop.add_child(_camera)
 	_camera.make_current()
+
+
+func _side_column(row: HBoxContainer) -> VBoxContainer:
+	var side := VBoxContainer.new()
+	side.add_theme_constant_override("separation", 10)
+	side.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(side)
+	return side
 
 
 func _spacer(height: float) -> Control:
