@@ -9,11 +9,13 @@ extends Node3D
 ##   tests/smoke/map_check가 모든 연결이 실제로 막혀 있지 않은지 검사한다.
 
 const WALL_HEIGHT := 4.0
-const WALL_COLOR := Color(0.42, 0.44, 0.47)
-const TALL_COLOR := Color(0.5, 0.36, 0.24)
-const LOW_COLOR := Color(0.3, 0.42, 0.5)
+const Surfaces := preload("res://game/world/surfaces.gd")
+## 구조물 종류. game/world/surfaces.gd의 재질 이름이다.
+const WALL_COLOR := "wall"
+const TALL_COLOR := "container"
+const LOW_COLOR := "crate"
 
-## 절반(z > 0)의 구조물. 각 항목은 [중심, 크기, 색].
+## 절반(z > 0)의 구조물. 각 항목은 [중심, 크기, 재질 종류].
 const HALF_BOXES := [
 	# 통로를 나누는 벽
 	[Vector3(-10.0, 1.75, 14.0), Vector3(1.0, 3.5, 16.0), WALL_COLOR],
@@ -82,7 +84,8 @@ const HALF_TO_CENTER := [[6, 0], [7, 1], [8, 2]]
 
 
 func _ready() -> void:
-	_sun.rotation_degrees = Vector3(-55.0, 40.0, 0.0)
+	_sun.rotation_degrees = Vector3(-48.0, 35.0, 0.0)
+	($Floor/Mesh as MeshInstance3D).material_override = Surfaces.material("floor")
 	_add_box(Vector3(-30.5, WALL_HEIGHT / 2.0, 0.0), Vector3(1.0, WALL_HEIGHT, 82.0), WALL_COLOR)
 	_add_box(Vector3(30.5, WALL_HEIGHT / 2.0, 0.0), Vector3(1.0, WALL_HEIGHT, 82.0), WALL_COLOR)
 	_add_box(Vector3(0.0, WALL_HEIGHT / 2.0, -40.5), Vector3(62.0, WALL_HEIGHT, 1.0), WALL_COLOR)
@@ -148,10 +151,8 @@ func _mirror(point: Vector3) -> Vector3:
 	return Vector3(-point.x, point.y, -point.z)
 
 
-func _add_box(center: Vector3, size: Vector3, color: Color) -> void:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.85
+func _add_box(center: Vector3, size: Vector3, kind: String) -> void:
+	var material := Surfaces.material(kind)
 	var body := StaticBody3D.new()
 	body.position = center
 	var mesh := BoxMesh.new()

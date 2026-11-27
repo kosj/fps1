@@ -15,3 +15,5 @@
 
 # 스크립트로 만든 작은 모델(수백 KB)은 LFS 없이 저장소에 직접 둔다.
 game/weapons/models/*.glb -filter -diff -merge -text
+# 1K 맵 텍스처도 LFS 없이 둔다(이 작업 환경에서 LFS 저장소로 올릴 수 없다).
+maps/textures/*.jpg -filter -diff -merge -text
