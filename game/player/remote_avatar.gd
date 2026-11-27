@@ -4,6 +4,9 @@ extends Node3D
 ## tools/asset_pipeline/merge_character.py로 합친 것이다.
 
 const HitMath := preload("res://game/combat/hit_math.gd")
+const Effects := preload("res://game/fx/effects.gd")
+const FLASH_TIME := 0.05
+const TRACER_LENGTH := 45.0
 const SOLDIER := preload("res://game/player/models/soldier.glb")
 ## 무기 칸 순서. game/player/player.gd의 기본 무장과 같다.
 const WEAPONS := [
@@ -41,6 +44,8 @@ var _has_last := false
 var _skeleton: Skeleton3D
 var _rifle: Node3D
 var _weapon_slot := -1
+var _flash: Node3D
+var _flash_left := 0.0
 var _grip_bone := -1
 var _support_bone := -1
 var _shown_alive := true
@@ -54,6 +59,9 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _animation == null:
 		return
+	if _flash != null and _flash.visible:
+		_flash_left -= delta
+		_flash.visible = _flash_left > 0.0
 	if _shown_alive != alive:
 		_shown_alive = alive
 		_has_last = false
@@ -128,11 +136,28 @@ func set_weapon(slot: int) -> void:
 	_rifle = (data.get("model") as PackedScene).instantiate() as Node3D
 	_rifle.visible = alive
 	add_child(_rifle)
+	_flash = Effects.muzzle_flash()
+	var muzzle := _rifle.find_child("muzzle", true, false) as Node3D
+	_flash.position = muzzle.position if muzzle != null else Vector3(0.0, 0.0, -0.7)
+	_rifle.add_child(_flash)
 
 
 func play_shot() -> void:
-	if _shot_audio != null and _shot_audio.is_inside_tree():
-		_shot_audio.play()
+	if _shot_audio == null or not _shot_audio.is_inside_tree():
+		return
+	_shot_audio.play()
+	if _flash == null or not visible:
+		return
+	# 총구 화염과, 바라보는 방향으로 뻗는 예광탄. 어디서 쏘는지 눈으로 알 수 있게 한다.
+	_flash_left = FLASH_TIME
+	Effects.show_flash(_flash)
+	var from := _flash.global_position
+	var to := from - global_transform.basis.z * TRACER_LENGTH
+	var query := PhysicsRayQueryParameters3D.create(from, to, 1)
+	var wall := get_world_3d().direct_space_state.intersect_ray(query)
+	if not wall.is_empty():
+		to = wall["position"]
+	Effects.tracer(get_tree().current_scene, from, to)
 
 
 func set_color(color: Color) -> void:

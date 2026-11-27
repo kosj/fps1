@@ -13,6 +13,7 @@ static var _tracer_material: StandardMaterial3D
 static var _dust_material: StandardMaterial3D
 static var _spark_material: StandardMaterial3D
 static var _brass_material: StandardMaterial3D
+static var _hit_material: StandardMaterial3D
 
 
 ## 가운데가 밝고 가장자리로 사라지는 둥근 텍스처.
@@ -114,6 +115,21 @@ static func impact(parent: Node, point: Vector3, normal: Vector3) -> Node3D:
 	root.add_child(_burst(_spark_material, 6, 0.045, 5.0, 0.25, 1.0, Vector3(0, -9.0, 0)))
 	parent.get_tree().create_timer(HOLE_TIME).timeout.connect(root.queue_free)
 	return root
+
+
+## 사람에게 맞았을 때: 탄흔 없이 짧은 붉은 안개만 낸다.
+static func hit_puff(parent: Node, point: Vector3) -> void:
+	if not parent.is_inside_tree():
+		return
+	if _hit_material == null:
+		_hit_material = _unshaded(Color(0.45, 0.04, 0.03, 0.75), false)
+		_hit_material.albedo_texture = glow_texture()
+		_hit_material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	var puff := _burst(_hit_material, 8, 0.16, 1.4, 0.35, 1.0, Vector3(0, -4.0, 0))
+	puff.spread = 180.0
+	parent.add_child(puff)
+	puff.global_position = point
+	parent.get_tree().create_timer(1.0).timeout.connect(puff.queue_free)
 
 
 ## 탄피 배출: 쏘는 동안만 emitting을 켜서 쓴다. 총 모델의 오른쪽 배출구에 붙인다.

@@ -30,6 +30,7 @@ const InputCmd := preload("res://game/player/input_cmd.gd")
 const HitMath := preload("res://game/combat/hit_math.gd")
 const WeaponState := preload("res://game/weapons/weapon_state.gd")
 const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
+const Effects := preload("res://game/fx/effects.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -775,10 +776,12 @@ func _resolve_shot(origin: Vector3, direction: Vector3, shooter_id: int) -> void
 		_rpc_damaged.rpc_id(best_id, shooter.global_position)
 	elif str(target_entry["kind"]) == "local":
 		target.show_damage_from(shooter.global_position)
+	var hit_point := origin + direction * best_distance
 	if str(shooter_entry["kind"]) == "peer":
-		_rpc_hit.rpc_id(shooter_id, best_headshot, killed)
+		_rpc_hit.rpc_id(shooter_id, best_headshot, killed, hit_point)
 	elif str(shooter_entry["kind"]) == "local":
 		shooter.show_hit(best_headshot, killed)
+		Effects.hit_puff(self, hit_point)
 
 
 func _announce_kill(killer: int, victim: int, killer_team: int, headshot: bool) -> void:
@@ -874,9 +877,10 @@ func _rpc_snapshot(tick: int, last_seq: int, own: Array, status: Array, others: 
 
 
 @rpc("authority", "call_remote", "reliable")
-func _rpc_hit(headshot: bool, killed: bool) -> void:
+func _rpc_hit(headshot: bool, killed: bool, at: Vector3) -> void:
 	if mode != Mode.CLIENT or _local == null:
 		return
+	Effects.hit_puff(self, at)
 	stats["hits"] += 1
 	if killed:
 		stats["kills"] += 1
