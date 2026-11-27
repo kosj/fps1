@@ -1,34 +1,62 @@
 extends Node3D
 ## 다른 플레이어의 모습. 서버 스냅샷을 버퍼에 쌓고 조금 과거 시점으로 보간해 부드럽게 그린다.
-## 임시 상자 모델이며 M3에서 캐릭터 모델로 교체한다.
+## 모델은 tools/asset_pipeline/build_soldier.py로 만든 관절별 부품이고,
+## 걷기·앉기·총 드는 자세는 부품 회전으로 만든다(game/player/avatar_pose.gd).
 
 const HitMath := preload("res://game/combat/hit_math.gd")
+const AvatarPose := preload("res://game/player/avatar_pose.gd")
+const SOLDIER := preload("res://game/player/models/soldier.glb")
+const RIFLE := preload("res://game/weapons/models/rifle_vk7.glb")
 const SHOT_SOUND := preload("res://game/audio/sfx/shot_rifle.ogg")
 const MAX_SAMPLES := 40
+const UNIFORM_SLOT := "uniform"
 
 var alive := true
 var low := false
 
 ## 각 항목은 [서버 틱, 위치, yaw, low, alive].
 var _samples: Array = []
-var _body: MeshInstance3D
-var _head: MeshInstance3D
+var _model: Node3D
+var _pose: AvatarPose
 var _material := StandardMaterial3D.new()
 var _shot_audio: AudioStreamPlayer3D
+var _last_position := Vector3.ZERO
+var _has_last := false
 
 
 func _ready() -> void:
 	build()
 
 
-## 임시 모델을 만든다. 트리에 넣지 않고 쓰는 테스트에서도 호출할 수 있다.
+func _process(delta: float) -> void:
+	if _pose == null or not visible:
+		return
+	# 보간된 위치(또는 붙어 있는 플레이어)의 실제 이동에서 속도를 구해 걸음을 맞춘다.
+	var now := global_position
+	var speed := 0.0
+	if _has_last and delta > 0.0:
+		speed = Vector2(now.x - _last_position.x, now.z - _last_position.z).length() / delta
+	_last_position = now
+	_has_last = true
+	_pose.update(delta, speed, low)
+
+
+## 모델을 만든다. 트리에 넣지 않고 쓰는 테스트에서도 호출할 수 있다.
 func build() -> void:
-	if _body != null:
+	if _model != null:
 		return
 	_material.albedo_color = Color(0.75, 0.25, 0.2)
-	_body = _add_part(Vector3(0.6, 1.0, 0.35), _material)
-	_head = _add_part(Vector3(0.28, 0.28, 0.28), _material)
-	_apply_height()
+	_material.roughness = 0.85
+	_model = SOLDIER.instantiate() as Node3D
+	add_child(_model)
+	for found in _model.find_children("*", "MeshInstance3D", true, false):
+		var part := found as MeshInstance3D
+		for surface in part.mesh.get_surface_count():
+			if part.mesh.surface_get_material(surface).resource_name == UNIFORM_SLOT:
+				part.set_surface_override_material(surface, _material)
+	_pose = AvatarPose.new()
+	_pose.bind(_model, RIFLE.instantiate() as Node3D)
+	_pose.update(0.0, 0.0, low)
 	# 거리와 방향이 들리는 3D 총소리. 적의 위치를 귀로 알 수 있게 한다.
 	_shot_audio = AudioStreamPlayer3D.new()
 	_shot_audio.stream = SHOT_SOUND
@@ -52,9 +80,7 @@ func set_color(color: Color) -> void:
 func set_pose(is_low: bool, is_alive: bool) -> void:
 	alive = is_alive
 	visible = is_alive
-	if low != is_low:
-		low = is_low
-		_apply_height()
+	low = is_low
 
 
 func push(tick: int, at: Vector3, yaw: float, is_low: bool, is_alive: bool) -> void:
@@ -88,24 +114,4 @@ func sample(render_tick: float) -> void:
 	rotation.y = lerp_angle(float(older[2]), float(newer[2]), weight)
 	alive = older[4]
 	visible = alive
-	if low != bool(older[3]):
-		low = older[3]
-		_apply_height()
-
-
-func _apply_height() -> void:
-	var height := HitMath.LOW_HEIGHT if low else HitMath.STAND_HEIGHT
-	var body_height := height - 0.28
-	(_body.mesh as BoxMesh).size.y = body_height
-	_body.position.y = body_height / 2.0
-	_head.position.y = height - 0.14
-
-
-func _add_part(size: Vector3, material: Material) -> MeshInstance3D:
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh.material = material
-	var part := MeshInstance3D.new()
-	part.mesh = mesh
-	add_child(part)
-	return part
+	low = older[3]

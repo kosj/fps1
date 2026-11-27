@@ -6,6 +6,7 @@ extends Node3D
 const PLAYER_SCENE := preload("res://game/player/player.tscn")
 const MAP_SCENE := preload("res://maps/depot/depot.tscn")
 const WEAPONS := ["weapon_1", "weapon_2", "weapon_3", "weapon_4"]
+const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const SETTLE_FRAMES := 50
 
 var _player: CharacterBody3D
@@ -31,6 +32,26 @@ func _ready() -> void:
 			_player.rotation.y = (points[0] as Transform3D).basis.get_euler().y
 	_player.position = spawn
 	add_child(_player)
+	# 3인칭 모습 확인용: 앞쪽에 서 있는 적, 앉은 아군, 걷는 적을 세운다.
+	var forward := -_player.global_transform.basis.z
+	var right := _player.global_transform.basis.x
+	_add_avatar(spawn + forward * 4.0 - right * 1.6, 0.6, false, Color(0.75, 0.25, 0.2), 0.0)
+	_add_avatar(spawn + forward * 4.5 + right * 0.2, 2.6, true, Color(0.25, 0.45, 0.8), 0.0)
+	_add_avatar(spawn + forward * 5.0 + right * 2.0, -1.2, false, Color(0.75, 0.25, 0.2), 2.5)
+
+
+func _add_avatar(at: Vector3, yaw: float, low: bool, color: Color, speed: float) -> void:
+	var avatar := RemoteAvatar.new()
+	add_child(avatar)
+	avatar.global_position = at
+	avatar.rotation.y = _player.rotation.y + yaw
+	avatar.set_color(color)
+	avatar.set_pose(low, true)
+	if speed > 0.0:
+		# 제자리 걷기: 걸음 모양만 보려고 속도를 직접 넣는다.
+		avatar.set_process(false)
+		var pose: RefCounted = avatar.get("_pose")
+		get_tree().process_frame.connect(func() -> void: pose.call("update", 0.016, speed, false))
 
 
 func _process(_delta: float) -> void:
