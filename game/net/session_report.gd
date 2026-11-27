@@ -10,6 +10,9 @@ static func check(is_client: bool, args: Dictionary, stats: Dictionary) -> Packe
 			failures.append("never connected")
 		if int(stats["snapshots"]) < 30:
 			failures.append("received only %d snapshots" % int(stats["snapshots"]))
+		# 들어오자마자 점수판을 받아야 한다(첫 킬을 기다리지 않는다).
+		if int(stats["score_rows"]) < 1:
+			failures.append("never received the scoreboard")
 	_at_least(failures, args, stats, "expect-players", "peak_players", "players")
 	_at_least(failures, args, stats, "expect-kills", "total_kills", "kills")
 	_at_least(failures, args, stats, "expect-zone-captures", "zone_captures", "zone captures")
