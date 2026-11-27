@@ -130,6 +130,8 @@ docs/                 기술 결정 기록, 에셋 품질 기준
 AI로 만든 메시를 넣기 전에는 `tools/asset_pipeline/analyze.py`로 삼각형 수·UV·파일 크기를 재고,
 기준은 `docs/asset_quality.md`를 따릅니다. 각진 물체는 AI 메시 대신 스크립트로 모델링합니다.
 
+휴대폰 확인: `tests/web/phone_check.mjs`가 웹 빌드를 헤드리스 크롬의 휴대폰 에뮬레이션으로 열어 메뉴와 게임 화면을 찍습니다(사용법은 파일 머리말).
+
 화면 확인: 창이 없는 환경에서도 `xvfb-run godot --rendering-driver opengl3 res://tests/shots/shots.tscn -- --out=build/shots`
 로 무기별 지향/정조준 화면을 PNG로 저장할 수 있습니다.
 
