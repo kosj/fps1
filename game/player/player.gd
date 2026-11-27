@@ -18,6 +18,11 @@ const Hud := preload("res://game/ui/hud.gd")
 const TouchControls := preload("res://game/ui/touch_controls.gd")
 const AimAssist := preload("res://game/player/aim_assist.gd")
 const SfxSynth := preload("res://game/audio/sfx_synth.gd")
+## ElevenLabs로 만든 효과음. 맞음/처치 알림음은 짧은 합성음을 그대로 쓴다.
+const SFX_DRY := preload("res://game/audio/sfx/dry.ogg")
+const SFX_RELOAD := preload("res://game/audio/sfx/reload.ogg")
+const SFX_STEP := preload("res://game/audio/sfx/step.ogg")
+const SFX_IMPACT := preload("res://game/audio/sfx/impact.ogg")
 const LOADOUT := [
 	preload("res://game/weapons/data/rifle_vk7.tres"),
 	preload("res://game/weapons/data/smg_kestrel.tres"),
@@ -558,9 +563,9 @@ func _build_view() -> void:
 	_add_sound("hit", SfxSynth.tone(1800.0, 0.06, 45.0), 4, -6.0)
 	_add_sound("headshot", SfxSynth.tone(2600.0, 0.08, 40.0), 4, -5.0)
 	_add_sound("kill", SfxSynth.kill_confirm(), 2, -4.0)
-	_add_sound("dry", SfxSynth.click(0.9, 0.05), 2, -8.0)
-	_add_sound("reload", SfxSynth.click(0.5, 0.12), 2, -6.0)
-	_add_sound("step", SfxSynth.footstep(), 3, -12.0)
+	_add_sound("dry", SFX_DRY, 2, -8.0)
+	_add_sound("reload", SFX_RELOAD, 2, -6.0)
+	_add_sound("step", SFX_STEP, 3, -10.0)
 	hud = Hud.new()
 	add_child(hud)
 	view_model = ViewModel.new()
@@ -601,6 +606,14 @@ func _on_impact(point: Vector3, _normal: Vector3) -> void:
 	get_parent().add_child(marker)
 	marker.global_position = point
 	get_tree().create_timer(IMPACT_LIFETIME).timeout.connect(marker.queue_free)
+	# 탄착음은 맞은 자리에서 난다. 표시가 사라질 때 함께 정리된다.
+	var sound := AudioStreamPlayer3D.new()
+	sound.stream = SFX_IMPACT
+	sound.unit_size = 6.0
+	sound.max_distance = 60.0
+	sound.pitch_scale = randf_range(0.9, 1.15)
+	marker.add_child(sound)
+	sound.play()
 
 
 func _on_weapon_changed(data: Resource) -> void:
@@ -608,6 +621,9 @@ func _on_weapon_changed(data: Resource) -> void:
 	hud.set_reloading(false)
 	view_model.set_weapon(data)
 	view_model.play_reload(WeaponController.SWITCH_TIME)
+	var shot := data.get("shot_sound") as AudioStream
+	if shot != null:
+		(_sounds["shot"] as AudioStreamPlayer).stream = shot
 
 
 func _nudge_sensitivity(factor: float) -> void:

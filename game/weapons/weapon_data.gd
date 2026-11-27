@@ -9,6 +9,10 @@ extends Resource
 ## 산탄이 조준점 주위로 퍼지는 각도. 정조준해도 줄지 않는다.
 @export var pellet_spread_deg := 0.0
 
+@export_group("Sound")
+## 발사음. 비우면 합성음을 쓴다.
+@export var shot_sound: AudioStream
+
 @export_group("Model")
 ## 1인칭 모델(GLB). body / mag / action 부품과 muzzle 위치를 담고 있다. 비우면 임시 상자 모델.
 @export var model: PackedScene

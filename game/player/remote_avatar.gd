@@ -3,7 +3,7 @@ extends Node3D
 ## 임시 상자 모델이며 M3에서 캐릭터 모델로 교체한다.
 
 const HitMath := preload("res://game/combat/hit_math.gd")
-const SfxSynth := preload("res://game/audio/sfx_synth.gd")
+const SHOT_SOUND := preload("res://game/audio/sfx/shot_rifle.ogg")
 const MAX_SAMPLES := 40
 
 var alive := true
@@ -31,7 +31,7 @@ func build() -> void:
 	_apply_height()
 	# 거리와 방향이 들리는 3D 총소리. 적의 위치를 귀로 알 수 있게 한다.
 	_shot_audio = AudioStreamPlayer3D.new()
-	_shot_audio.stream = SfxSynth.gunshot()
+	_shot_audio.stream = SHOT_SOUND
 	_shot_audio.unit_size = 14.0
 	_shot_audio.max_distance = 110.0
 	_shot_audio.max_polyphony = 4
