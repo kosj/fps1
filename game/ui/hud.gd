@@ -6,7 +6,8 @@ const Crosshair := preload("res://game/ui/crosshair.gd")
 const MARGIN := 32
 const FEED_TIME := 5.0
 const FEED_LINES := 5
-const TEAM_LABELS := ["BLUE", "RED"]
+## 색은 아군 파랑, 적 빨강으로 보이므로(팀 이름과 무관) 점수판 머리글도 그 기준으로 쓴다.
+const SCORE_HEADERS := ["YOUR TEAM", "ENEMY"]
 
 var _crosshair: Crosshair
 var _ammo_label: Label
@@ -158,7 +159,7 @@ func set_scoreboard(shown: bool, lines: Array, own_team: int) -> void:
 		for child in grid.get_children():
 			child.queue_free()
 		var color := Color(0.5, 0.75, 1.0) if side == 0 else Color(1.0, 0.5, 0.45)
-		for header: String in [TEAM_LABELS[team], "K", "D"]:
+		for header: String in [SCORE_HEADERS[side], "K", "D"]:
 			grid.add_child(_score_cell(header, color, header.length() > 1))
 		for line: Array in lines:
 			if int(line[0]) != team:
