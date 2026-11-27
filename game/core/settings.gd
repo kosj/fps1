@@ -6,6 +6,7 @@ const SENSITIVITY := "input/sensitivity_scale"
 const BOT_COUNT := "match/bots"
 const SERVER_ADDRESS := "match/server_address"
 const GAME_MODE := "match/mode"
+const MAP := "match/map"
 const DIFFICULTY := "match/difficulty"
 const LOW_GRAPHICS := "video/low"
 ## 터치 조작: "auto"(기기를 보고 판단), "on", "off".

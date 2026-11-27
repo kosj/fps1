@@ -110,7 +110,8 @@ game/                 core, movement, player, weapons, combat, match, bots, net,
 game/weapons/models/  총기와 1인칭 팔 GLB
 game/player/models/   병사 GLB (동작 8종 포함)
 game/audio/sfx/       효과음 OGG
-maps/                 맵 씬, maps/textures(재질), maps/props(엄폐물 GLB)
+maps/                 맵 씬(depot, compound), maps/catalog.gd(맵 목록), maps/arena_base.gd(대칭 맵 공통),
+                      maps/textures(재질), maps/props(엄폐물 GLB)
 tests/                단위 테스트, smoke, 네트워크 테스트, shots(화면 캡처)
 tools/asset_pipeline/ 에셋 제작 스크립트 (Blender)
 docs/                 기술 결정 기록, 에셋 품질 기준

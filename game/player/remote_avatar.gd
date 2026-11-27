@@ -26,8 +26,8 @@ const CROUCH_CLIP_SPEED := 1.6
 const DEATH_SHOW_TIME := 3.2
 const GRIP_BONE := "RightHand"
 const SUPPORT_BONE := "LeftHand"
-## 손목 뼈에서 총 원점(방아쇠 위 총열 축)까지: [총구 방향, 위쪽] (m).
-const GRIP_OFFSET := Vector2(0.1, 0.07)
+## 손목 뼈가 손바닥보다 위에 있는 만큼 총을 올린다(m).
+const WRIST_LIFT := -0.02
 
 var alive := true
 var low := false
@@ -46,6 +46,8 @@ var _rifle: Node3D
 var _weapon_slot := -1
 var _flash: Node3D
 var _flash_left := 0.0
+## 두 손의 가운데에서 총 원점까지: [총구 방향, 위쪽] (m). 무기마다 다르다.
+var _hold_offset := Vector2(-0.1, 0.07)
 var _grip_bone := -1
 var _support_bone := -1
 var _shown_alive := true
@@ -134,6 +136,12 @@ func set_weapon(slot: int) -> void:
 	if _rifle != null:
 		_rifle.queue_free()
 	_rifle = (data.get("model") as PackedScene).instantiate() as Node3D
+	# 동작의 두 손은 가까이 모여 있다. 손잡이와 총열 덮개의 가운데를 두 손 사이에 오게 해서
+	# 개머리판이 어깨 쪽으로 오고, 긴 총일수록 뒤로 더 물리게 한다.
+	var grip_at: Vector3 = data.get("grip_point")
+	var support_at: Vector3 = data.get("support_point")
+	var middle := (grip_at + support_at) * 0.5
+	_hold_offset = Vector2(middle.z, -middle.y + WRIST_LIFT)
 	_rifle.visible = alive
 	add_child(_rifle)
 	_flash = Effects.muzzle_flash()
@@ -250,5 +258,6 @@ func _hold_rifle() -> void:
 	var side := forward.cross(Vector3.UP).normalized()
 	var up := side.cross(forward)
 	_rifle.global_transform = Transform3D(
-		Basis(side, up, -forward), grip + forward * GRIP_OFFSET.x + up * GRIP_OFFSET.y
+		Basis(side, up, -forward),
+		(grip + support) * 0.5 + forward * _hold_offset.x + up * _hold_offset.y
 	)

@@ -6,6 +6,7 @@ signal start_requested(kind: String, options: Dictionary)
 
 const MenuKit := preload("res://game/ui/menu_kit.gd")
 const Settings := preload("res://game/core/settings.gd")
+const Catalog := preload("res://maps/catalog.gd")
 ## 공용 서버(Render 무료 요금제). 예전 기본값(내 PC)이 저장돼 있으면 이 주소로 바꿔 보여 준다.
 const DEFAULT_ADDRESS := "wss://fps1-server.onrender.com"
 const OLD_DEFAULT_ADDRESS := "127.0.0.1:7777"
@@ -28,6 +29,7 @@ var join_button: Button
 var address_edit: LineEdit
 var bot_count: SpinBox
 var mode_select: OptionButton
+var map_select: OptionButton
 var difficulty_select: OptionButton
 var low_graphics: CheckButton
 
@@ -80,18 +82,16 @@ func _ready() -> void:
 	var options_row := HBoxContainer.new()
 	options_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	options_row.add_theme_constant_override("separation", 12)
+	map_select = OptionButton.new()
+	for title: String in Catalog.titles():
+		map_select.add_item("Map: %s" % title)
+	map_select.selected = maxi(Catalog.names().find(str(Settings.read(Settings.MAP, "depot"))), 0)
+	options_row.add_child(map_select)
 	difficulty_select = OptionButton.new()
 	for level: String in DIFFICULTIES:
 		difficulty_select.add_item("Bots: %s" % level.capitalize())
 	difficulty_select.selected = maxi(DIFFICULTIES.find(Settings.difficulty()), 0)
 	options_row.add_child(difficulty_select)
-	low_graphics = CheckButton.new()
-	low_graphics.text = "Low graphics"
-	low_graphics.button_pressed = Settings.low_graphics()
-	low_graphics.toggled.connect(
-		func(enabled: bool) -> void: Settings.write(Settings.LOW_GRAPHICS, enabled)
-	)
-	options_row.add_child(low_graphics)
 	left.add_child(options_row)
 
 	range_button = MenuKit.button("SHOOTING RANGE")
@@ -115,6 +115,14 @@ func _ready() -> void:
 	right.add_child(MenuKit.sensitivity_row(Callable()))
 	right.add_child(MenuKit.ui_scale_row(get_tree()))
 	right.add_child(MenuKit.touch_toggle(Callable()))
+	low_graphics = CheckButton.new()
+	low_graphics.text = "Low graphics"
+	low_graphics.add_theme_font_size_override("font_size", 18)
+	low_graphics.button_pressed = Settings.low_graphics()
+	low_graphics.toggled.connect(
+		func(enabled: bool) -> void: Settings.write(Settings.LOW_GRAPHICS, enabled)
+	)
+	right.add_child(low_graphics)
 	var device := "mobile" if Settings.is_mobile() else "desktop"
 	var info := "build %s  |  detected: %s" % [Settings.build_version(), device]
 	right.add_child(MenuKit.label(info, 14))
@@ -131,7 +139,10 @@ func _on_play() -> void:
 	var difficulty: String = DIFFICULTIES[difficulty_select.selected]
 	Settings.write(Settings.GAME_MODE, game_mode)
 	Settings.write(Settings.DIFFICULTY, difficulty)
-	start_requested.emit("bots", {"bots": bots, "mode": game_mode, "difficulty": difficulty})
+	var map_name: String = Catalog.names()[map_select.selected]
+	Settings.write(Settings.MAP, map_name)
+	var options := {"bots": bots, "mode": game_mode, "difficulty": difficulty, "map": map_name}
+	start_requested.emit("bots", options)
 
 
 func _on_join() -> void:

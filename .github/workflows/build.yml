@@ -86,6 +86,12 @@ jobs:
           timeout 300 ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/map_check.tscn 2>&1 | tee map.log
           ! grep -q "SCRIPT ERROR" map.log
 
+      - name: Check the Compound map
+        run: |
+          timeout 300 ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/map_check.tscn \
+            -- --map=compound 2>&1 | tee map2.log
+          ! grep -q "SCRIPT ERROR" map2.log
+
       - name: Run menu smoke test
         run: |
           timeout 300 ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/menu_smoke.tscn 2>&1 | tee menu.log
@@ -102,6 +108,25 @@ jobs:
           timeout 300 ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --mode=dom \
             --exit-after=60 --expect-zone-captures=2 2>&1 | tee dom.log
           ! grep -q "SCRIPT ERROR" dom.log
+
+      - name: Run domination bot match on Compound
+        run: |
+          timeout 300 ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --mode=dom \
+            --map=compound --exit-after=60 --expect-kills=3 --expect-zone-captures=2 2>&1 | tee dom2.log
+          ! grep -q "SCRIPT ERROR" dom2.log
+
+      # 서버가 다른 맵을 돌리고 있으면 클라이언트가 그 맵으로 바꿔야 한다.
+      - name: Client follows the server's map
+        run: |
+          timeout 60 ~/godot/godot --headless -- --server --port=7790 --map=compound --bots=3 \
+            --exit-after=24 > mapserver.log 2>&1 &
+          sleep 4
+          timeout 60 ~/godot/godot --headless -- --connect=127.0.0.1:7790 --bot=shooter \
+            --exit-after=14 2>&1 | tee mapclient.log
+          grep -q "map: compound" mapclient.log
+          grep -q "NETTEST client:shooter ok" mapclient.log
+          ! grep -q "SCRIPT ERROR" mapclient.log
+          wait
 
       - name: Run network test (server + 2 bot clients, 50 ms delay each way)
         run: GODOT=~/godot/godot tests/net/run_net_test.sh lagcomp
@@ -204,3 +229,26 @@ jobs:
           retention-days: 3
           name: fps1-linux-server
           path: build/server
+
+  # 내보낸 Windows 실행 파일이 실제 Windows에서 뜨고 봇 경기를 끝까지 도는지 확인한다.
+  # 화면 없이(--headless) 돌리므로 렌더링은 확인하지 못한다.
+  windows-run:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: fps1-windows
+          path: win
+      - name: Run a bot match on Windows
+        run: |
+          cd win
+          ls -la
+          EXE=./fps1.exe
+          [ -f ./fps1.console.exe ] && EXE=./fps1.console.exe
+          timeout 300 "$EXE" --headless --fixed-fps 60 --log-file "$PWD/match.log" -- \
+            --spectate --bots=6 --exit-after=40 --expect-kills=1 || true
+          cat match.log
+          grep -q "NETTEST local ok" match.log
+          ! grep -q "SCRIPT ERROR" match.log

@@ -61,7 +61,8 @@ class Gun:
         if bevel > 0:
             mod = obj.modifiers.new("bevel", "BEVEL")
             mod.width = bevel
-            mod.segments = 2
+            # 작은 모서리는 한 번만 깎는다. 1인칭 거리에서도 차이가 보이지 않고 삼각형이 크게 준다.
+            mod.segments = 2 if bevel >= 0.003 else 1
             mod.limit_method = "ANGLE"
             mod.angle_limit = math.radians(40)
             mod.harden_normals = False

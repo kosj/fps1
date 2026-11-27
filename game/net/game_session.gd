@@ -34,6 +34,8 @@ const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const Effects := preload("res://game/fx/effects.gd")
 const Authority := preload("res://game/net/authority.gd")
 const Connector := preload("res://game/net/connector.gd")
+const LaunchArgs := preload("res://game/core/launch_args.gd")
+const Catalog := preload("res://maps/catalog.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -132,7 +134,7 @@ func _ready() -> void:
 	var rescale := Settings.apply_ui_scale.bind(window)
 	if not window.size_changed.is_connected(rescale):
 		window.size_changed.connect(rescale)
-	_parse_args()
+	_args = LaunchArgs.parse()
 	if _left_game:
 		# 링크(?connect=)로 들어왔다가 나온 뒤에는 다시 자동 접속하지 않고 시작 화면을 보여 준다.
 		_args.erase("connect")
@@ -141,7 +143,7 @@ func _ready() -> void:
 	_delay_ticks = int(round(float(_args.get("net-delay-ms", "0")) * Protocol.TICK_RATE / 1000.0))
 	if _args.has("bot"):
 		_bot = ScriptBot.new(str(_args["bot"]))
-	_load_map(str(_args.get("map", RANGE_MAP if _args.has("range") else DEFAULT_MAP)))
+	_load_map(Catalog.path(str(_args.get("map", RANGE_MAP if _args.has("range") else DEFAULT_MAP))))
 
 	var direct := OS.has_feature("dedicated_server")
 	for key: String in DIRECT_START_ARGS:
@@ -164,6 +166,23 @@ func _load_map(path: String) -> void:
 	_navigator = null
 	if _map.has_method("nav_graph"):
 		_navigator = NavGraph.new(_map.call("nav_graph"))
+
+
+## 경기 중에 맵을 바꾼다(판 사이의 맵 순환, 서버가 알려 준 맵). 같은 맵이면 아무것도 하지 않는다.
+func _change_map(map_name: String) -> void:
+	if Catalog.path(map_name) == _map.scene_file_path:
+		return
+	_load_map(Catalog.path(map_name))
+	print("map: %s" % map_name)
+	_apply_quality()
+	_view.clear_zones()
+	if _domination != null:
+		var captures := _domination.captures
+		_domination = Domination.new(_map.call("capture_zones"))
+		_domination.captures = captures
+	for id: int in _peers:
+		if _peers[id]["bot"] != null:
+			_peers[id]["bot"].use_navigator(_navigator)
 
 
 func is_started() -> bool:
@@ -225,6 +244,7 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 			_local = _spawn_player(true, 0)
 		_:
 			mode = Mode.LOCAL_MATCH
+			_change_map(str(options.get("map", "depot")))
 			_difficulty = str(options.get("difficulty", Settings.difficulty()))
 			_set_game_mode(str(options.get("mode", "tdm")))
 			_local = _add_participant(LOCAL_ID, "local")["player"]
@@ -256,30 +276,6 @@ func _score_limit() -> int:
 
 func _apply_quality() -> void:
 	Settings.apply_quality(_map, get_viewport())
-
-
-## 터치 조작의 조준 보조에 쓸, 지금 보이는 적들의 가슴 위치.
-func _update_assist_targets() -> void:
-	var targets: Array = []
-	var eye: Vector3 = _local.eye_position()
-	var candidates: Array = []
-	if mode == Mode.CLIENT:
-		for id: int in _avatars:
-			var avatar: RemoteAvatar = _avatars[id]
-			if avatar.alive and int(avatar.get_meta("team", -1)) != _view.own_team:
-				candidates.append([avatar.position, avatar.low])
-	else:
-		for id: int in _peers:
-			var other = _peers[id]["player"]
-			if int(_peers[id]["team"]) != _view.own_team and other.alive:
-				candidates.append([other.global_position, other.is_low()])
-	for candidate: Array in candidates:
-		var chest: Vector3 = candidate[0] + Vector3.UP * (0.7 if candidate[1] else 1.1)
-		var offset := chest - eye
-		var wall: Dictionary = _local.weapon.world_ray(eye, offset.normalized(), 1)
-		if wall.is_empty() or eye.distance_to(wall["position"]) >= offset.length():
-			targets.append(chest)
-	_local.assist_targets = targets
 
 
 func _resume() -> void:
@@ -343,7 +339,9 @@ func _physics_process(delta: float) -> void:
 			if _local != null:
 				_local.simulate(_next_local_cmd(delta), delta)
 	if _local != null and _local.touch != null:
-		_update_assist_targets()
+		_local.assist_targets = Authority.assist_targets(
+			_local, _avatars if mode == Mode.CLIENT else _peers, mode == Mode.CLIENT, _view.own_team
+		)
 	if _exit_after > 0.0 and _elapsed >= _exit_after:
 		_finish()
 
@@ -365,21 +363,6 @@ func _process(delta: float) -> void:
 
 
 # ---------------------------------------------------------------- 공통
-
-
-func _parse_args() -> void:
-	for argument in OS.get_cmdline_user_args():
-		if not argument.begins_with("--"):
-			continue
-		var parts := argument.substr(2).split("=", true, 1)
-		_args[parts[0]] = parts[1] if parts.size() > 1 else ""
-	# 웹 빌드에는 명령줄이 없으므로 주소창의 ?connect=호스트:포트 를 읽는다.
-	if OS.has_feature("web"):
-		var query := str(JavaScriptBridge.eval("window.location.search", true))
-		for pair in query.trim_prefix("?").split("&", false):
-			var parts := pair.split("=", true, 1)
-			if parts.size() == 2 and parts[0] in ["connect", "map"]:
-				_args[parts[0]] = parts[1].uri_decode()
 
 
 func _spawn_player(local: bool, spawn_index: int):
@@ -431,6 +414,7 @@ func _start_server(port: int) -> void:
 
 func _on_peer_connected(id: int) -> void:
 	_add_participant(id, "peer")
+	_rpc_map.rpc_id(id, Catalog.name_of(_map.scene_file_path))
 	_send_scores()
 	print("peer %d joined (%d players)" % [id, _peers.size()])
 
@@ -659,8 +643,13 @@ func _start_new_match() -> void:
 	_time_left = MATCH_TIME
 	if _domination != null:
 		_domination.reset()
+	# 판마다 다음 맵으로 넘어간다. 목록에 없는 맵(테스트용)은 그대로 둔다.
+	var following := Catalog.next(Catalog.name_of(_map.scene_file_path))
+	_change_map(following)
 	for id: int in _peers:
 		var entry: Dictionary = _peers[id]
+		if str(entry["kind"]) == "peer":
+			_rpc_map.rpc_id(id, following)
 		entry["kills"] = 0
 		entry["deaths"] = 0
 		_respawn(id, entry)
@@ -688,19 +677,7 @@ func _respawn(id: int, entry: Dictionary) -> void:
 
 
 func _send_snapshots() -> void:
-	var rows: Array = []
-	for id: int in _peers:
-		var player = _peers[id]["player"]
-		var flags := 0
-		if player.is_low():
-			flags |= Protocol.FLAG_LOW
-		if player.alive:
-			flags |= Protocol.FLAG_ALIVE
-		if _peers[id]["fired"]:
-			flags |= Protocol.FLAG_FIRED
-			_peers[id]["fired"] = false
-		flags |= (int(player.weapon.slot) & Protocol.SLOT_MASK) << Protocol.SLOT_SHIFT
-		rows.append([id, player.global_position, player.rotation.y, flags, _peers[id]["team"]])
+	var rows := Authority.snapshot_rows(_peers)
 	for id: int in _peers:
 		var entry: Dictionary = _peers[id]
 		if str(entry["kind"]) != "peer":
@@ -892,6 +869,11 @@ func _rpc_hit(headshot: bool, killed: bool, at: Vector3) -> void:
 func _rpc_damaged(from: Vector3) -> void:
 	if mode == Mode.CLIENT and _local != null:
 		_local.show_damage_from(from)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_map(map_name: String) -> void:
+	_change_map(map_name)
 
 
 @rpc("authority", "call_remote", "reliable")

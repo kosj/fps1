@@ -17,3 +17,11 @@
 |---|---|---|
 | corrugated_iron_02 | https://polyhaven.com/a/corrugated_iron_02 | 경기장 밖 창고 건물 |
 | container_grey | container_side의 색 텍스처를 회색으로 바꾼 것 | 컨테이너 색 변형(초록·파랑·녹슨 빨강)의 바탕 |
+
+Compound 맵:
+
+| 파일 접두어 | 에셋 | 용도 |
+|---|---|---|
+| dry_ground_01 | https://polyhaven.com/a/dry_ground_01 | 바닥(마른 흙) |
+| yellow_plaster | https://polyhaven.com/a/yellow_plaster | 건물 벽 |
+| red_brick_03 | https://polyhaven.com/a/red_brick_03 | 담 |
