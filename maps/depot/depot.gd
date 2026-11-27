@@ -53,6 +53,16 @@ const HALF_BOXES := [
 	[Vector3(15.0, 1.25, 12.0), Vector3(2.0, 2.5, 3.0), TALL_COLOR],
 	[Vector3(24.0, 1.25, 6.0), Vector3(3.0, 2.5, 1.5), TALL_COLOR],
 	[Vector3(16.5, 0.6, 21.0), Vector3(3.0, 1.2, 1.2), LOW_COLOR],
+	# 통로 가장자리의 방호벽과 드럼통. 이동 그래프의 선(x = -20, 0, 20, z = 26, 30)은 비워 둔다.
+	[Vector3(-27.0, 0.5, 11.0), Vector3(0.6, 1.0, 3.0), "barrier"],
+	[Vector3(-13.0, 0.5, 17.0), Vector3(1.4, 1.0, 1.4), "barrels"],
+	[Vector3(-27.5, 0.5, 23.0), Vector3(1.4, 1.0, 1.4), "barrels"],
+	[Vector3(-6.5, 0.5, 19.0), Vector3(3.0, 1.0, 0.6), "barrier"],
+	[Vector3(7.0, 0.5, 22.5), Vector3(1.4, 1.0, 1.4), "barrels"],
+	[Vector3(3.8, 0.5, 8.0), Vector3(3.0, 1.0, 0.6), "barrier"],
+	[Vector3(27.0, 0.5, 10.5), Vector3(0.6, 1.0, 3.0), "barrier"],
+	[Vector3(13.0, 0.5, 19.0), Vector3(1.4, 1.0, 1.4), "barrels"],
+	[Vector3(27.5, 0.5, 23.0), Vector3(1.4, 1.0, 1.4), "barrels"],
 ]
 
 ## 0팀(z > 0) 스폰 위치. 1팀은 180도 돌린 자리를 쓴다.
