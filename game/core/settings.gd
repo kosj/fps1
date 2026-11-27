@@ -14,6 +14,8 @@ const UI_SCALE := "ui/scale"
 const MIN_UI_SCALE := 0.8
 const MAX_UI_SCALE := 2.0
 ## 휴대폰은 화면이 작아 같은 배율로는 글자가 작게 보이므로 기본값을 키운다.
+const BASE_SIZE := Vector2(1280.0, 720.0)
+const PORTRAIT_WIDTH := 780.0
 const MOBILE_UI_SCALE := 1.5
 const MIN_SENSITIVITY := 0.2
 const MAX_SENSITIVITY := 4.0
@@ -65,6 +67,22 @@ static func touch_enabled() -> bool:
 ## 빌드 번호. 배포할 때 커밋 번호가 들어가며, 어떤 버전을 보고 있는지 확인하는 데 쓴다.
 static func build_version() -> String:
 	return str(ProjectSettings.get_setting("application/config/version", "dev"))
+
+
+## 창 크기에 맞는 UI 배율. 세로로 든 휴대폰에서는 엔진이 폭 1280 기준으로 화면을 줄여
+## 글자가 읽을 수 없게 작아지므로, 화면 폭이 PORTRAIT_WIDTH만큼의 UI 폭이 되도록 키운다.
+static func scale_for(window: Vector2, base: float) -> float:
+	if window.x <= 0.0 or window.x >= window.y:
+		return base
+	var engine := minf(window.x / BASE_SIZE.x, window.y / BASE_SIZE.y)
+	return base * (window.x / PORTRAIT_WIDTH) / engine
+
+
+## 저장된 UI 크기와 지금 창 모양에 맞춰 배율을 적용한다. 창 크기가 바뀔 때마다 부른다.
+static func apply_ui_scale(root: Window) -> void:
+	var wanted := scale_for(Vector2(root.size), ui_scale())
+	if not is_equal_approx(root.content_scale_factor, wanted):
+		root.content_scale_factor = wanted
 
 
 static func ui_scale() -> float:

@@ -122,7 +122,9 @@ var _remote_max_x := -INF
 
 
 func _ready() -> void:
-	get_tree().root.content_scale_factor = Settings.ui_scale()
+	var window := get_tree().root
+	Settings.apply_ui_scale(window)
+	window.size_changed.connect(Settings.apply_ui_scale.bind(window))
 	_parse_args()
 	_exit_after = float(_args.get("exit-after", "0"))
 	_lag_comp = not _args.has("no-lagcomp")

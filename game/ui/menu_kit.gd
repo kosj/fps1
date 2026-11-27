@@ -87,7 +87,7 @@ static func ui_scale_row(tree: SceneTree) -> HBoxContainer:
 static func _apply_ui_scale(value: float, readout: Label, tree: SceneTree) -> void:
 	readout.text = "%d%%" % int(round(value * 100.0))
 	Settings.write(Settings.UI_SCALE, value)
-	tree.root.content_scale_factor = value
+	Settings.apply_ui_scale(tree.root)
 
 
 ## 터치 조작 켜기/끄기. 자동 판단이 틀렸을 때 직접 바꿀 수 있다.

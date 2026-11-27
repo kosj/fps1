@@ -74,13 +74,19 @@ func show_match(hud, status: Array) -> void:
 	var score_b: int = status[2]
 	var seconds := int(ceilf(float(status[3])))
 	var clock := "%d:%02d" % [seconds / 60, seconds % 60]
-	hud.set_score(
-		"%s %d  -  %d %s    %s    K %d  D %d  [%s]"
-		% [
-			TEAM_NAMES[0], score_a, score_b, TEAM_NAMES[1], clock,
-			int(status[5]), int(status[6]), TEAM_NAMES[team],
-		]
-	)
+	if hud.is_narrow():
+		# 세로로 든 휴대폰: 일시 정지 버튼과 탄약 표시 사이에 들어가도록 내 팀 점수를 앞에 두고 짧게 쓴다.
+		var mine := score_a if team == 0 else score_b
+		var theirs := score_b if team == 0 else score_a
+		hud.set_score("%d - %d   %s" % [mine, theirs, clock])
+	else:
+		hud.set_score(
+			"%s %d  -  %d %s    %s    K %d  D %d  [%s]"
+			% [
+				TEAM_NAMES[0], score_a, score_b, TEAM_NAMES[1], clock,
+				int(status[5]), int(status[6]), TEAM_NAMES[team],
+			]
+		)
 	var message := ""
 	if bool(status[4]):
 		var own := score_a if team == 0 else score_b
