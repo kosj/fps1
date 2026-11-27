@@ -11,6 +11,7 @@ const KEY_ACTIONS := {
 	"sprint": KEY_SHIFT,
 	"crouch": KEY_CTRL,
 	"reload": KEY_R,
+	"grenade": KEY_G,
 	"weapon_1": KEY_1,
 	"weapon_2": KEY_2,
 	"weapon_3": KEY_3,

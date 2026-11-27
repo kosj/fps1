@@ -100,7 +100,7 @@ jobs:
       - name: Run bot match (6 bots play team deathmatch for 60 simulated seconds)
         run: |
           timeout 300 ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --exit-after=60 \
-            --expect-kills=3 2>&1 | tee botmatch.log
+            --expect-kills=3 --expect-grenades=1 2>&1 | tee botmatch.log
           ! grep -q "SCRIPT ERROR" botmatch.log
 
       - name: Run domination bot match (bots must capture zones)

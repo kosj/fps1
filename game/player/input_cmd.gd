@@ -7,7 +7,8 @@ const CROUCH := 4
 const FIRE := 8
 const AIM := 16
 const RELOAD := 32
-const ALL_BUTTONS := 63
+const GRENADE := 64
+const ALL_BUTTONS := 127
 const PITCH_LIMIT := 1.55
 const MAX_WEAPON_SLOT := 3
 

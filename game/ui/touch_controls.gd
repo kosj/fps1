@@ -3,7 +3,7 @@ extends Control
 ##
 ## - 화면 왼쪽을 누른 자리에 가상 스틱이 생긴다. 끝까지 앞으로 밀면 달린다.
 ## - 화면 오른쪽을 끌면 시선이 돈다. 발사 버튼을 누른 채 끌어도 시선이 돈다.
-## - 버튼: 발사, 정조준(누를 때마다 켜고 끔), 점프, 앉기(누르는 동안), 재장전, 무기 교체, 일시 정지.
+## - 버튼: 발사, 정조준(누를 때마다 켜고 끔), 점프, 앉기(누르는 동안), 재장전, 무기 교체, 수류탄, 일시 정지.
 ##
 ## 입력 해석은 handle_touch와 handle_drag에 모아 화면 없이도 테스트할 수 있게 했다.
 
@@ -70,6 +70,8 @@ func buttons() -> int:
 		bits |= InputCmd.JUMP
 	if _tap_left.has("reload"):
 		bits |= InputCmd.RELOAD
+	if _tap_left.has("grenade"):
+		bits |= InputCmd.GRENADE
 	if move.y < -SPRINT_THRESHOLD:
 		bits |= InputCmd.SPRINT
 	return bits
@@ -128,7 +130,7 @@ func _press(button: String) -> void:
 			_weapon_steps += 1
 		"pause":
 			pause_pressed.emit()
-		"reload":
+		"reload", "grenade":
 			_tap_left[button] = TAP_HOLD_TIME
 		"jump", "crouch":
 			# 짧게 눌러도 한 틱 이상 입력으로 잡히게 잠시 유지한다.
@@ -152,6 +154,7 @@ func _layout() -> Dictionary:
 		"crouch": [Vector2(area.x - 225.0, area.y - 205.0), 42.0, "DUCK"],
 		"reload": [Vector2(area.x - 355.0, area.y - 65.0), 38.0, "R"],
 		"weapon": [Vector2(area.x - 190.0, area.y - 300.0), 38.0, "GUN"],
+		"grenade": [Vector2(area.x - 315.0, area.y - 170.0), 38.0, "NADE"],
 		"pause": [Vector2(60.0, 60.0), 34.0, "II"],
 	}
 
