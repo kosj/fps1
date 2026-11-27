@@ -93,8 +93,9 @@ func show_match(hud, status: Array) -> void:
 		elif own < other:
 			title = "DEFEAT"
 			color = Color(1.0, 0.4, 0.35)
-		var detail := "%s %d  -  %d %s\nKills %d    Deaths %d\nNext match starting soon" % [
-			TEAM_NAMES[0], score_a, score_b, TEAM_NAMES[1], int(status[5]), int(status[6]),
+		# 개인 킬/데스는 아래 점수판에 나온다.
+		var detail := "%s %d  -  %d %s    Next match starting soon" % [
+			TEAM_NAMES[0], score_a, score_b, TEAM_NAMES[1],
 		]
 		hud.set_result(title, color, detail)
 	else:
@@ -102,3 +103,19 @@ func show_match(hud, status: Array) -> void:
 		if not bool(status[7]):
 			message = "RESPAWNING"
 	hud.set_message(message)
+
+
+## 점수판. rows는 [id, 팀, 킬, 데스, 봇 여부]. 죽었거나 판이 끝났을 때(force), 또는 Tab을 누르는 동안 보인다.
+func show_scores(hud: Node, rows: Array, own_id: int, force: bool) -> void:
+	var shown := force or Input.is_action_pressed("scoreboard")
+	var lines: Array = []
+	if shown:
+		for row: Array in rows:
+			var id := int(row[0])
+			var player_name := "YOU" if id == own_id else _name_of(id, bool(row[4]))
+			lines.append([int(row[1]), player_name, int(row[2]), int(row[3]), id == own_id])
+	hud.set_scoreboard(shown, lines, own_team)
+
+
+func _name_of(id: int, is_bot: bool) -> String:
+	return "BOT %d" % (id % 100) if is_bot else "PLAYER %d" % (id % 1000)

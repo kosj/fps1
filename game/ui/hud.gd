@@ -6,6 +6,7 @@ const Crosshair := preload("res://game/ui/crosshair.gd")
 const MARGIN := 32
 const FEED_TIME := 5.0
 const FEED_LINES := 5
+const TEAM_LABELS := ["BLUE", "RED"]
 
 var _crosshair: Crosshair
 var _ammo_label: Label
@@ -18,6 +19,9 @@ var _damage_overlay: ColorRect
 var _result_dim: ColorRect
 var _result_title: Label
 var _result_detail: Label
+var _score_panel: PanelContainer
+var _score_columns: Array = []
+var _score_hash := 0
 var _message_label: Label
 var _notice_label: Label
 var _zone_row: HBoxContainer
@@ -116,6 +120,8 @@ func set_result(title: String, color: Color, detail: String) -> void:
 		box.set_anchors_preset(Control.PRESET_CENTER)
 		box.grow_horizontal = Control.GROW_DIRECTION_BOTH
 		box.grow_vertical = Control.GROW_DIRECTION_BOTH
+		# 아래에 점수판이 오므로 결과 문구는 화면 위쪽에 둔다.
+		box.position.y -= 150.0
 		box.alignment = BoxContainer.ALIGNMENT_CENTER
 		box.add_theme_constant_override("separation", 14)
 		_result_dim.add_child(box)
@@ -133,6 +139,70 @@ func set_result(title: String, color: Color, detail: String) -> void:
 	_result_title.text = title
 	_result_title.add_theme_color_override("font_color", color)
 	_result_detail.text = detail
+
+
+## 점수판. lines는 [팀, 이름, 킬, 데스, 나인지]. 내 팀이 왼쪽에 온다.
+func set_scoreboard(shown: bool, lines: Array, own_team: int) -> void:
+	if _score_panel == null:
+		if not shown:
+			return
+		_build_scoreboard()
+	_score_panel.visible = shown
+	var content_hash := [lines, own_team].hash()
+	if not shown or content_hash == _score_hash:
+		return
+	_score_hash = content_hash
+	for side in 2:
+		var team := own_team if side == 0 else 1 - own_team
+		var grid: GridContainer = _score_columns[side]
+		for child in grid.get_children():
+			child.queue_free()
+		var color := Color(0.5, 0.75, 1.0) if side == 0 else Color(1.0, 0.5, 0.45)
+		for header: String in [TEAM_LABELS[team], "K", "D"]:
+			grid.add_child(_score_cell(header, color, header.length() > 1))
+		for line: Array in lines:
+			if int(line[0]) != team:
+				continue
+			var tint := Color(1.0, 0.95, 0.6) if bool(line[4]) else Color(0.92, 0.92, 0.92)
+			grid.add_child(_score_cell(str(line[1]), tint, true))
+			grid.add_child(_score_cell(str(line[2]), tint, false))
+			grid.add_child(_score_cell(str(line[3]), tint, false))
+
+
+func _build_scoreboard() -> void:
+	var root := _damage_overlay.get_parent() as Control
+	_score_panel = PanelContainer.new()
+	_score_panel.set_anchors_preset(Control.PRESET_CENTER)
+	_score_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_score_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_score_panel.position.y += 190.0
+	_score_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.03, 0.04, 0.06, 0.78)
+	style.set_content_margin_all(18.0)
+	style.set_corner_radius_all(6)
+	_score_panel.add_theme_stylebox_override("panel", style)
+	root.add_child(_score_panel)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 48)
+	_score_panel.add_child(row)
+	for side in 2:
+		var grid := GridContainer.new()
+		grid.columns = 3
+		grid.add_theme_constant_override("h_separation", 22)
+		grid.add_theme_constant_override("v_separation", 4)
+		row.add_child(grid)
+		_score_columns.append(grid)
+
+
+func _score_cell(text: String, color: Color, wide: bool) -> Label:
+	var cell := Label.new()
+	cell.text = text
+	cell.add_theme_font_size_override("font_size", 24)
+	cell.add_theme_color_override("font_color", color)
+	cell.custom_minimum_size.x = 170.0 if wide else 36.0
+	cell.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if wide else HORIZONTAL_ALIGNMENT_RIGHT
+	return cell
 
 
 func flash_damage() -> void:
