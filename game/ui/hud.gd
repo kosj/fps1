@@ -15,6 +15,9 @@ var _hint_label: Label
 var _health_label: Label
 var _score_label: Label
 var _damage_overlay: ColorRect
+var _result_dim: ColorRect
+var _result_title: Label
+var _result_detail: Label
 var _message_label: Label
 var _notice_label: Label
 var _zone_row: HBoxContainer
@@ -100,6 +103,38 @@ func set_message(text: String) -> void:
 
 
 ## 피격 시 화면 가장자리가 붉게 번쩍인다.
+## 경기 결과 화면. title이 비어 있으면 숨긴다.
+func set_result(title: String, color: Color, detail: String) -> void:
+	if _result_dim == null:
+		var root := _damage_overlay.get_parent() as Control
+		_result_dim = ColorRect.new()
+		_result_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_result_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_result_dim.color = Color(0.0, 0.0, 0.0, 0.55)
+		root.add_child(_result_dim)
+		var box := VBoxContainer.new()
+		box.set_anchors_preset(Control.PRESET_CENTER)
+		box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		box.grow_vertical = Control.GROW_DIRECTION_BOTH
+		box.alignment = BoxContainer.ALIGNMENT_CENTER
+		box.add_theme_constant_override("separation", 14)
+		_result_dim.add_child(box)
+		_result_title = Label.new()
+		_result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_result_title.add_theme_font_size_override("font_size", 96)
+		_result_title.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
+		_result_title.add_theme_constant_override("outline_size", 10)
+		box.add_child(_result_title)
+		_result_detail = Label.new()
+		_result_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_result_detail.add_theme_font_size_override("font_size", 34)
+		box.add_child(_result_detail)
+	_result_dim.visible = title != ""
+	_result_title.text = title
+	_result_title.add_theme_color_override("font_color", color)
+	_result_detail.text = detail
+
+
 func flash_damage() -> void:
 	_damage_overlay.color.a = 0.35
 

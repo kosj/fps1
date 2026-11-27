@@ -85,11 +85,20 @@ func show_match(hud, status: Array) -> void:
 	if bool(status[4]):
 		var own := score_a if team == 0 else score_b
 		var other := score_b if team == 0 else score_a
-		message = "DRAW"
+		var title := "DRAW"
+		var color := Color(0.9, 0.9, 0.9)
 		if own > other:
-			message = "VICTORY"
+			title = "VICTORY"
+			color = Color(0.45, 0.75, 1.0)
 		elif own < other:
-			message = "DEFEAT"
-	elif not bool(status[7]):
-		message = "RESPAWNING"
+			title = "DEFEAT"
+			color = Color(1.0, 0.4, 0.35)
+		var detail := "%s %d  -  %d %s\nKills %d    Deaths %d\nNext match starting soon" % [
+			TEAM_NAMES[0], score_a, score_b, TEAM_NAMES[1], int(status[5]), int(status[6]),
+		]
+		hud.set_result(title, color, detail)
+	else:
+		hud.set_result("", Color.WHITE, "")
+		if not bool(status[7]):
+			message = "RESPAWNING"
 	hud.set_message(message)
