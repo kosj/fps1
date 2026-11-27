@@ -12,3 +12,6 @@
 *.wav filter=lfs diff=lfs merge=lfs -text
 *.ogg filter=lfs diff=lfs merge=lfs -text
 *.mp3 filter=lfs diff=lfs merge=lfs -text
+
+# 스크립트로 만든 작은 모델(수백 KB)은 LFS 없이 저장소에 직접 둔다.
+game/weapons/models/*.glb -filter -diff -merge -text

@@ -416,7 +416,8 @@ func _process(delta: float) -> void:
 	_damage_sources = _damage_sources.filter(func(item: Array) -> bool: return float(item[1]) > 0.0)
 	hud.set_damage_marks(marks)
 
-	hud.set_crosshair(weapon.current_spread_deg(), aim, _camera.fov)
+	var scope := smoothstep(0.8, 1.0, aim) if weapon.data.hide_when_aimed else 0.0
+	hud.set_crosshair(weapon.current_spread_deg(), aim, _camera.fov, scope)
 	hud.set_hint_visible(false)
 
 
@@ -605,6 +606,7 @@ func _on_impact(point: Vector3, _normal: Vector3) -> void:
 func _on_weapon_changed(data: Resource) -> void:
 	hud.set_weapon_name("%d  %s" % [weapon.slot + 1, data.get("display_name")])
 	hud.set_reloading(false)
+	view_model.set_weapon(data)
 	view_model.play_reload(WeaponController.SWITCH_TIME)
 
 

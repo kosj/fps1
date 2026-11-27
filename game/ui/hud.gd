@@ -180,10 +180,11 @@ func set_hint_visible(shown: bool) -> void:
 	_hint_label.visible = shown
 
 
-func set_crosshair(spread_deg: float, aim_blend: float, fov: float) -> void:
+func set_crosshair(spread_deg: float, aim_blend: float, fov: float, scope := 0.0) -> void:
 	_crosshair.spread_deg = spread_deg
 	_crosshair.aim_blend = aim_blend
 	_crosshair.fov = fov
+	_crosshair.scope_blend = scope
 
 
 func show_hit(headshot: bool, killed: bool) -> void:
