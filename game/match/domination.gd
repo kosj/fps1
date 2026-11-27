@@ -12,8 +12,6 @@ const CAPTURE_TIME := 6.0
 const DECAY_TIME := 4.0
 const SCORE_LIMIT := 150
 const NEUTRAL := -1
-## 봇이 한 번에 노리는 거점 수(가까운 순).
-const NEAREST_GOALS := 2
 
 var names: Array = []
 var centers: Array = []
@@ -96,12 +94,9 @@ func objectives_for(team: int, position: Vector3) -> Array:
 			wanted.append(centers[index])
 	if wanted.is_empty():
 		return centers.duplicate()
-	# 가까운 거점 둘만 노린다. 먼 거점까지 흩어지면 밀리는 팀이 한 명씩 들어가다 계속 진다.
-	wanted.sort_custom(
-		func(a: Vector3, b: Vector3) -> bool:
-			return position.distance_squared_to(a) < position.distance_squared_to(b)
-	)
-	return wanted.slice(0, NEAREST_GOALS)
+	# 팀이 한 거점에 모인다. 각자 가까운 곳으로 흩어지면 밀리는 팀이 한 명씩 들어가다 계속 진다.
+	# 0팀은 A부터, 1팀은 C부터 노려서 서로 다른 쪽에서 시작해 가운데(B)에서 만난다.
+	return [wanted[0] if team == 0 else wanted[wanted.size() - 1]]
 
 
 func _update_zone(index: int, count_a: int, count_b: int, delta: float) -> void:
