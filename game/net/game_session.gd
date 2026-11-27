@@ -32,6 +32,7 @@ const HitMath := preload("res://game/combat/hit_math.gd")
 const WeaponState := preload("res://game/weapons/weapon_state.gd")
 const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const Effects := preload("res://game/fx/effects.gd")
+const Authority := preload("res://game/net/authority.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -80,6 +81,8 @@ var stats := {
 var _args := {}
 var _started := false
 var _menu: MainMenu
+## 점수판 줄(클라이언트는 킬 통보와 함께 받는다). [id, 팀, 킬, 데스, 봇 여부].
+var _score_rows: Array = []
 var _pause: PauseMenu
 var _map: Node
 var _tick := 0
@@ -588,24 +591,7 @@ func _simulate_peer(entry: Dictionary, delta: float, frozen: bool) -> void:
 func _bot_cmd(id: int, entry: Dictionary, delta: float) -> InputCmd:
 	var player = entry["player"]
 	var eye: Vector3 = player.eye_position()
-	var forward := Vector3(-sin(player.rotation.y), 0.0, -cos(player.rotation.y))
-	var visible: Array = []
-	for other: int in _peers:
-		var target_entry: Dictionary = _peers[other]
-		var target = target_entry["player"]
-		if other == id or int(target_entry["team"]) == int(entry["team"]) or not target.alive:
-			continue
-		var chest: Vector3 = target.global_position + Vector3.UP * 1.0
-		var offset := chest - eye
-		var distance := offset.length()
-		if distance > BOT_SIGHT_RANGE or distance < 0.01:
-			continue
-		if distance > BOT_NEAR_RANGE and forward.dot(offset / distance) < 0.5:
-			continue
-		var wall: Dictionary = player.weapon.world_ray(eye, offset / distance, 1)
-		if not wall.is_empty() and eye.distance_to(wall["position"]) < distance:
-			continue
-		visible.append(target.global_position)
+	var visible := Authority.visible_enemies(_peers, id, BOT_SIGHT_RANGE, BOT_NEAR_RANGE)
 	var bot: CombatBot = entry["bot"]
 	var goals := _nav_points
 	bot.has_hold = false
@@ -716,6 +702,8 @@ func _update_local_hud() -> void:
 			_intermission_left > 0.0, entry["kills"], entry["deaths"], _local.alive,
 		]
 	)
+	var show_scores: bool = not _local.alive or _intermission_left > 0.0
+	_view.show_scores(_local.hud, Authority.score_rows(_peers), LOCAL_ID, show_scores)
 
 
 ## 서버 판정. 쏜 사람이 화면에서 보던 시점(view_tick)으로 상대 위치를 되감아 맞았는지 계산한다.
@@ -736,26 +724,10 @@ func _resolve_shot(origin: Vector3, direction: Vector3, shooter_id: int) -> void
 	if not _lag_comp:
 		rewind_tick = float(_tick)
 
-	var best_id := 0
-	var best_distance := reach
-	var best_headshot := false
-	for id: int in _peers:
-		if id == shooter_id or not _peers[id]["player"].alive:
-			continue
-		# 같은 팀과 방금 리스폰한 상대는 맞지 않는다.
-		if int(_peers[id]["team"]) == int(shooter_entry["team"]):
-			continue
-		if float(_peers[id]["protected"]) > 0.0:
-			continue
-		var past: Array = HitMath.history_at(_peers[id]["history"], rewind_tick)
-		if past.is_empty():
-			continue
-		var hit := HitMath.player_hit(origin, direction, past[0], past[1])
-		var distance: float = hit[0]
-		if distance >= 0.0 and distance < best_distance:
-			best_id = id
-			best_distance = distance
-			best_headshot = hit[1]
+	var found := Authority.find_target(_peers, shooter_id, origin, direction, reach, rewind_tick)
+	var best_id: int = found[0]
+	var best_distance: float = found[1]
+	var best_headshot: bool = found[2]
 	if best_id == 0:
 		return
 
@@ -794,7 +766,7 @@ func _announce_kill(killer: int, victim: int, killer_team: int, headshot: bool) 
 		return
 	for id: int in _peers:
 		if str(_peers[id]["kind"]) == "peer":
-			_rpc_kill.rpc_id(id, killer, victim, killer_team, headshot)
+			_rpc_kill.rpc_id(id, killer, victim, killer_team, headshot, Authority.score_rows(_peers))
 
 
 # ---------------------------------------------------------------- 클라이언트
@@ -897,10 +869,11 @@ func _rpc_damaged(from: Vector3) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _rpc_kill(killer: int, victim: int, killer_team: int, headshot: bool) -> void:
+func _rpc_kill(killer: int, victim: int, team: int, headshot: bool, scores: Array) -> void:
+	_score_rows = scores
 	if mode == Mode.CLIENT and _local != null:
 		var own_id := multiplayer.get_unique_id()
-		_view.show_kill(_local.hud, killer, victim, killer_team, headshot, own_id)
+		_view.show_kill(_local.hud, killer, victim, team, headshot, own_id)
 
 
 func _apply_snapshot(
@@ -940,6 +913,8 @@ func _apply_snapshot(
 		_local.hud,
 		[status[5], status[6], status[7], status[8], status[9], status[3], status[4], status[1]]
 	)
+	var show_scores: bool = not bool(status[1]) or bool(status[9])
+	_view.show_scores(_local.hud, _score_rows, multiplayer.get_unique_id(), show_scores)
 	if not (status[11] as Array).is_empty():
 		_view.show_zones(self, _local.hud, _map.call("capture_zones"), status[11])
 	_reconcile(last_seq, own, delta)
