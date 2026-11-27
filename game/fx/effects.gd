@@ -66,9 +66,10 @@ static func tracer(parent: Node, from: Vector3, to: Vector3) -> void:
 	if length < 1.5 or not parent.is_inside_tree():
 		return
 	if _tracer_material == null:
-		_tracer_material = _unshaded(Color(1.0, 0.85, 0.5, 0.55), true)
+		# 밝은 벽 앞에서도 보이도록 더하기 혼합이 아닌 일반 혼합을 쓴다.
+		_tracer_material = _unshaded(Color(1.0, 0.92, 0.65, 0.9), false)
 	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.012, 0.012, length)
+	mesh.size = Vector3(0.014, 0.014, length)
 	mesh.material = _tracer_material
 	var line := MeshInstance3D.new()
 	line.mesh = mesh
@@ -82,21 +83,22 @@ static func tracer(parent: Node, from: Vector3, to: Vector3) -> void:
 static func impact(parent: Node, point: Vector3, normal: Vector3) -> Node3D:
 	if _hole_material == null:
 		_hole_material = StandardMaterial3D.new()
-		_hole_material.albedo_color = Color(0.03, 0.03, 0.03, 0.9)
+		_hole_material.albedo_color = Color(0.0, 0.0, 0.0, 1.0)
 		_hole_material.albedo_texture = glow_texture()
 		_hole_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		_hole_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_dust_material = _unshaded(Color(0.62, 0.6, 0.56, 0.5), false)
+		_dust_material = _unshaded(Color(0.5, 0.47, 0.42, 0.4), false)
 		_dust_material.albedo_texture = glow_texture()
 		_dust_material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 		_spark_material = _unshaded(Color(1.0, 0.8, 0.4), true)
+		_spark_material.albedo_texture = glow_texture()
 		_spark_material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	var root := Node3D.new()
 	parent.add_child(root)
 	root.look_at_from_position(point + normal * 0.006, point + normal, _up_for(normal))
 
 	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE * randf_range(0.07, 0.11)
+	quad.size = Vector2.ONE * randf_range(0.11, 0.16)
 	quad.material = _hole_material
 	var hole := MeshInstance3D.new()
 	hole.mesh = quad
@@ -105,8 +107,11 @@ static func impact(parent: Node, point: Vector3, normal: Vector3) -> Node3D:
 	hole.rotation.y = PI
 	root.add_child(hole)
 
-	root.add_child(_burst(_dust_material, 10, 0.16, 1.6, PUFF_TIME, 0.9, Vector3(0, -1.5, 0)))
-	root.add_child(_burst(_spark_material, 6, 0.02, 5.0, 0.25, 1.0, Vector3(0, -9.0, 0)))
+	var dust := _burst(_dust_material, 10, 0.24, 1.6, PUFF_TIME, 0.9, Vector3(0, -1.5, 0))
+	# 카메라를 보는 먼지 판이 벽에 반쯤 묻히지 않게 표면에서 조금 띄워 시작한다.
+	dust.position.z = -0.1
+	root.add_child(dust)
+	root.add_child(_burst(_spark_material, 6, 0.045, 5.0, 0.25, 1.0, Vector3(0, -9.0, 0)))
 	parent.get_tree().create_timer(HOLE_TIME).timeout.connect(root.queue_free)
 	return root
 
