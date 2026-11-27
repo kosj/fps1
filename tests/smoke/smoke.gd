@@ -110,6 +110,9 @@ func _physics_process(_delta: float) -> void:
 		578:
 			_expect(_player.get("touch") != null, "set_touch did not create touch controls")
 			_expect(_player.call("input_active"), "touch controls should be active when not paused")
+			# 버튼은 화면 크기를 기준으로 놓이므로, 크기가 0이면 전부 화면 밖에 그려진다.
+			var touch_area: Vector2 = (_player.get("touch") as Control).size
+			_expect(touch_area.x > 100.0 and touch_area.y > 100.0, "touch controls have no area")
 			_player.call("set_paused", true)
 			_expect(not _player.call("input_active"), "paused touch controls still accept input")
 		580:
