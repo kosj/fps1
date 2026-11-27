@@ -6,6 +6,7 @@
 //   TAPS="418,95,45000" node tests/web/phone_check.mjs http://127.0.0.1:8123/ /tmp/web mobile
 //
 // TAPS는 "x,y,대기ms;..." 형식의 터치 목록. 위 예는 PLAY VS BOTS를 누르고 45초 기다린다.
+// GESTURES로 누르고 있기·끌기·중간 화면 찍기를 이어서 할 수 있다(아래 코드의 주석 참고).
 // 결과: <outPrefix>_menu.png, <outPrefix>_game.png 와 브라우저 콘솔 로그.
 // GPU가 없는 환경에서는 소프트웨어 렌더링이라 매우 느리다(게임 화면까지 1분 안팎).
 import { spawn } from 'node:child_process';
@@ -63,6 +64,29 @@ const info = await send('Runtime.evaluate', { expression: `JSON.stringify({w: in
 console.log('PAGE', info.result?.value);
 const taps = (process.env.TAPS ?? '').split(';').filter(Boolean).map((p) => p.split(',').map(Number));
 for (const [x, y, wait] of taps) { await tap(x, y); await sleep(wait ?? 3000); }
-if (taps.length) { await sleep(Number(process.env.GAME_WAIT ?? 30000)); await shot('game'); }
+// GESTURES="hold,x,y,ms;drag,x1,y1,x2,y2,ms;shot,name" : 누르고 있기, 끌기(끝에서 ms 동안 유지), 화면 찍기.
+const touchPoint = (x, y, id) => ({ x, y, id });
+for (const g of (process.env.GESTURES ?? '').split(';').filter(Boolean)) {
+  const [kind2, ...rest] = g.split(',');
+  const n = rest.map(Number);
+  if (kind2 === 'hold') {
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touchPoint(n[0], n[1], 1)] });
+    await sleep(n[2]);
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else if (kind2 === 'drag') {
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touchPoint(n[0], n[1], 1)] });
+    for (let i = 1; i <= 10; i++) {
+      await sleep(120);
+      const x = n[0] + ((n[2] - n[0]) * i) / 10, y = n[1] + ((n[3] - n[1]) * i) / 10;
+      await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [touchPoint(x, y, 1)] });
+    }
+    await sleep(n[4] ?? 0);
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else if (kind2 === 'shot') {
+    await sleep(1500);
+    await shot(rest[0]);
+  }
+}
+if (taps.length && !process.env.GESTURES) { await sleep(Number(process.env.GAME_WAIT ?? 30000)); await shot('game'); }
 console.log('LOGS'); for (const l of logs.filter((l) => !/^log: $/.test(l)).slice(0, 40)) console.log('  ' + l.slice(0, 220));
 ws.close(); chrome.kill(); process.exit(0);
