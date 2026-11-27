@@ -66,7 +66,8 @@ const info = await send('Runtime.evaluate', { expression: `JSON.stringify({w: in
 console.log('PAGE', info.result?.value);
 const taps = (process.env.TAPS ?? '').split(';').filter(Boolean).map((p) => p.split(',').map(Number));
 for (const [x, y, wait] of taps) { await tap(x, y); await sleep(wait ?? 3000); }
-// GESTURES="hold,x,y,ms;drag,x1,y1,x2,y2,ms;shot,name" : 누르고 있기, 끌기(끝에서 ms 동안 유지), 화면 찍기.
+// GESTURES="hold,x,y,ms;holdshot,x,y,ms,name;drag,x1,y1,x2,y2,ms;shot,name"
+// : 누르고 있기, 누른 채 찍기, 끌기(끝에서 ms 동안 유지), 화면 찍기.
 const touchPoint = (x, y, id) => ({ x, y, id });
 for (const g of (process.env.GESTURES ?? '').split(';').filter(Boolean)) {
   const [kind2, ...rest] = g.split(',');
@@ -74,6 +75,12 @@ for (const g of (process.env.GESTURES ?? '').split(';').filter(Boolean)) {
   if (kind2 === 'hold') {
     await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touchPoint(n[0], n[1], 1)] });
     await sleep(n[2]);
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else if (kind2 === 'holdshot') {
+    // 누른 채로 화면을 찍는다: holdshot,x,y,ms,이름
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touchPoint(n[0], n[1], 1)] });
+    await sleep(n[2]);
+    await shot(rest[3]);
     await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   } else if (kind2 === 'drag') {
     await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touchPoint(n[0], n[1], 1)] });

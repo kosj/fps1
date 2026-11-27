@@ -28,6 +28,15 @@ func _ready() -> void:
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_label.add_theme_font_size_override("font_size", 30)
 	shade.add_child(_label)
+	# 서버가 깨어나길 기다리는 동안에도 시작 화면으로 돌아갈 수 있어야 한다.
+	var back := Button.new()
+	back.text = "BACK"
+	back.custom_minimum_size = Vector2(220.0, 46.0)
+	back.add_theme_font_size_override("font_size", 20)
+	back.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	back.position += Vector2(-110.0, -90.0)
+	back.pressed.connect(func() -> void: failed.emit(""))
+	shade.add_child(back)
 	multiplayer.connected_to_server.connect(_on_connected)
 	multiplayer.connection_failed.connect(_on_attempt_failed)
 	multiplayer.server_disconnected.connect(_on_disconnected)
@@ -58,6 +67,10 @@ func _process(delta: float) -> void:
 func _attempt() -> void:
 	_retry_in = -1.0
 	var peer := WebSocketMultiplayerPeer.new()
+	# 화면이 잠깐 멈추면(탭 전환 등) 그사이 온 스냅샷이 쌓인다. 기본 64KB로는 몇 초 만에 넘쳐
+	# 킬 알림 같은 신뢰 전송까지 버려지므로 넉넉히 잡는다.
+	peer.inbound_buffer_size = 1 << 20
+	peer.max_queued_packets = 8192
 	var error := peer.create_client(_url)
 	if error != OK:
 		failed.emit("Could not connect: bad address")
