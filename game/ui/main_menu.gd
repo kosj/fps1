@@ -8,6 +8,12 @@ const MenuKit := preload("res://game/ui/menu_kit.gd")
 const Settings := preload("res://game/core/settings.gd")
 const DEFAULT_ADDRESS := "127.0.0.1:7777"
 const DIFFICULTIES := ["easy", "normal", "hard"]
+const BACKDROP_MAP := "res://maps/depot/depot.tscn"
+const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
+## 배경 카메라가 맵 가운데를 도는 반지름, 높이, 한 바퀴 시간(초).
+const ORBIT_RADIUS := 17.0
+const ORBIT_HEIGHT := 5.5
+const ORBIT_PERIOD := 90.0
 
 var play_button: Button
 var range_button: Button
@@ -18,10 +24,14 @@ var mode_select: OptionButton
 var difficulty_select: OptionButton
 var low_graphics: CheckButton
 
+var _camera: Camera3D
+var _orbit := 0.6
+
 
 func _ready() -> void:
 	layer = 20
-	var column := MenuKit.centered_column(self, Color(0.07, 0.08, 0.1, 1.0))
+	_build_backdrop()
+	var column := MenuKit.centered_column(self, Color(0.04, 0.05, 0.07, 0.68))
 	column.add_child(MenuKit.label("FPS1", 48))
 	column.add_child(_spacer(6.0))
 
@@ -106,6 +116,40 @@ func _on_join() -> void:
 		return
 	Settings.write(Settings.SERVER_ADDRESS, address)
 	start_requested.emit("join", {"address": address})
+
+
+func _process(delta: float) -> void:
+	if _camera == null:
+		return
+	_orbit += delta * TAU / ORBIT_PERIOD
+	_camera.position = Vector3(cos(_orbit) * ORBIT_RADIUS, ORBIT_HEIGHT, sin(_orbit) * ORBIT_RADIUS)
+	_camera.look_at(Vector3(0.0, 1.2, 0.0))
+
+
+## 메뉴 뒤에 보이는 배경: 실제 맵을 천천히 도는 카메라와 서 있는 병사 몇 명.
+## 메뉴가 닫히면 함께 사라진다. 낮은 그래픽 설정에서는 만들지 않는다.
+func _build_backdrop() -> void:
+	if Settings.low_graphics() or not ResourceLoader.exists(BACKDROP_MAP):
+		return
+	var backdrop := Node3D.new()
+	add_child(backdrop)
+	backdrop.add_child((load(BACKDROP_MAP) as PackedScene).instantiate())
+	var poses := [
+		[Vector3(-2.5, 0.0, 3.0), 2.4, Color(0.25, 0.45, 0.8), false],
+		[Vector3(-4.2, 0.0, 4.4), 2.9, Color(0.25, 0.45, 0.8), true],
+		[Vector3(3.0, 0.0, -3.5), -0.6, Color(0.75, 0.25, 0.2), false],
+	]
+	for pose: Array in poses:
+		var soldier := RemoteAvatar.new()
+		backdrop.add_child(soldier)
+		soldier.position = pose[0]
+		soldier.rotation.y = pose[1]
+		soldier.set_color(pose[2])
+		soldier.set_pose(pose[3], true)
+	_camera = Camera3D.new()
+	_camera.fov = 60.0
+	backdrop.add_child(_camera)
+	_camera.make_current()
 
 
 func _spacer(height: float) -> Control:
