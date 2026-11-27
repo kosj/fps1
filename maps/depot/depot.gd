@@ -10,6 +10,8 @@ extends Node3D
 
 const WALL_HEIGHT := 4.0
 const Surfaces := preload("res://game/world/surfaces.gd")
+const AMBIENCE := preload("res://game/audio/sfx/ambience_yard.ogg")
+const AMBIENCE_VOLUME_DB := -22.0
 ## 구조물 종류. game/world/surfaces.gd의 재질 이름이다.
 const WALL_COLOR := "wall"
 const TALL_COLOR := "container"
@@ -130,6 +132,14 @@ func _ready() -> void:
 		_add_box(box[0], box[1], kind)
 		_add_box(_mirror(box[0]), box[1], other)
 	_add_backdrop()
+	# 야적장의 바람과 먼 기계음. 끝과 처음을 겹쳐 만든 반복 음원이다.
+	var ambience := AudioStreamPlayer.new()
+	var loop := AMBIENCE as AudioStreamOggVorbis
+	loop.loop = true
+	ambience.stream = loop
+	ambience.volume_db = AMBIENCE_VOLUME_DB
+	ambience.autoplay = true
+	add_child(ambience)
 
 
 func spawn_count() -> int:
