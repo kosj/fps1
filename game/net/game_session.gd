@@ -66,6 +66,7 @@ static var _left_game := false
 var mode := Mode.LOCAL_MATCH
 var stats := {
 	"connected": false,
+	"score_rows": 0,
 	"snapshots": 0,
 	"corrections": 0,
 	"max_error": 0.0,
@@ -430,6 +431,7 @@ func _start_server(port: int) -> void:
 
 func _on_peer_connected(id: int) -> void:
 	_add_participant(id, "peer")
+	_send_scores()
 	print("peer %d joined (%d players)" % [id, _peers.size()])
 
 
@@ -438,6 +440,7 @@ func _on_peer_disconnected(id: int) -> void:
 		return
 	_peers[id]["player"].queue_free()
 	_peers.erase(id)
+	_send_scores()
 	print("peer %d left (%d players)" % [id, _peers.size()])
 
 
@@ -661,6 +664,14 @@ func _start_new_match() -> void:
 		entry["kills"] = 0
 		entry["deaths"] = 0
 		_respawn(id, entry)
+	_send_scores()
+
+
+## 점수판은 킬이 날 때 함께 보내지만, 누가 들어오거나 나갈 때와 새 판이 시작될 때도 맞춰 준다.
+func _send_scores() -> void:
+	for id: int in _peers:
+		if str(_peers[id]["kind"]) == "peer":
+			_rpc_scores.rpc_id(id, Authority.score_rows(_peers))
 
 
 func _respawn(id: int, entry: Dictionary) -> void:
@@ -881,6 +892,12 @@ func _rpc_hit(headshot: bool, killed: bool, at: Vector3) -> void:
 func _rpc_damaged(from: Vector3) -> void:
 	if mode == Mode.CLIENT and _local != null:
 		_local.show_damage_from(from)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_scores(scores: Array) -> void:
+	_score_rows = scores
+	stats["score_rows"] = scores.size()
 
 
 @rpc("authority", "call_remote", "reliable")
