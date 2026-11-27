@@ -64,7 +64,8 @@ func tick(delta: float) -> void:
 		var from := body.global_position
 		var to := from + velocity * delta
 		# 맵 구조물(충돌 층 1)에만 부딪힌다. 사람은 통과한다.
-		var query := PhysicsRayQueryParameters3D.create(from, to + velocity.normalized() * BODY_RADIUS, 1)
+		var reach := to + velocity.normalized() * BODY_RADIUS
+		var query := PhysicsRayQueryParameters3D.create(from, reach, 1)
 		var hit := space.intersect_ray(query)
 		if not hit.is_empty() and not (hit["collider"] is CharacterBody3D):
 			var normal: Vector3 = hit["normal"]

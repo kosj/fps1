@@ -311,7 +311,7 @@ func _physics_process(delta: float) -> void:
 		_finish()
 
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if _pause != null:
 		# 접속 중에는 접속 안내 화면(BACK 버튼)이 대신한다.
 		_pause.visible = _local != null and not _local.input_active()
@@ -691,7 +691,9 @@ func _resolve_shot(origin: Vector3, direction: Vector3, shooter_id: int) -> void
 
 
 ## 피해를 주고, 죽으면 점수와 킬 알림까지 처리한다. 총과 수류탄이 함께 쓴다.
-func _apply_damage(shooter_id: int, target_id: int, amount: float, headshot: bool, at: Vector3) -> void:
+func _apply_damage(
+	shooter_id: int, target_id: int, amount: float, headshot: bool, at: Vector3
+) -> void:
 	var shooter_entry: Dictionary = _peers[shooter_id]
 	var shooter = shooter_entry["player"]
 	var target_entry: Dictionary = _peers[target_id]
