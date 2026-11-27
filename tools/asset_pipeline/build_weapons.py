@@ -3,6 +3,8 @@
 blender -b --python build_weapons.py -- <out_dir> [--preview <png_dir>]
 
 AI 메시는 각진 면이 뭉개지므로 총기는 단면 돌출 + 베벨 + 면적 가중 노멀로 직접 만든다.
+표면은 절차적 재질(색 얼룩, 모서리 마모, 틈새 그늘)을 총 한 자루당 1K 텍스처 두 장
+(색, AO·러프니스·메탈릭)으로 구워 입힌다.
 좌표: 총구가 +Y, 위가 +Z, 폭이 X (GLB로 내보내면 Godot에서 총구가 -Z, 위가 +Y).
 원점은 방아쇠 위 총열 축 근처. 부품은 몸통(body), 탄창(mag), 움직이는 부품(action)으로 나눈다.
 """
@@ -15,9 +17,9 @@ import bpy
 from mathutils import Vector
 
 MATERIALS = {
-    "metal": ((0.2, 0.21, 0.23), 0.8, 0.42),
-    "steel": ((0.42, 0.43, 0.45), 0.9, 0.32),
-    "polymer": ((0.1, 0.105, 0.11), 0.0, 0.6),
+    "metal": ((0.11, 0.115, 0.125), 0.8, 0.42),
+    "steel": ((0.3, 0.31, 0.33), 0.9, 0.32),
+    "polymer": ((0.05, 0.052, 0.055), 0.0, 0.6),
     "rubber": ((0.02, 0.02, 0.02), 0.0, 0.9),
     "olive": ((0.16, 0.19, 0.11), 0.0, 0.7),
     "tan": ((0.42, 0.34, 0.22), 0.0, 0.7),
@@ -401,6 +403,175 @@ def build_sniper():
     return g.build()
 
 
+TEXTURE_SIZE = 1024
+## 재질별 마모 색: 금속은 밝은 쇠가 드러나고, 폴리머·고무는 허옇게 닳는다.
+WEAR = {
+    "metal": ((0.55, 0.55, 0.56), 1.0), "steel": ((0.7, 0.7, 0.72), 0.6),
+    "polymer": ((0.2, 0.2, 0.2), 0.7), "rubber": ((0.12, 0.12, 0.12), 0.4),
+    "olive": ((0.35, 0.36, 0.3), 0.8), "tan": ((0.6, 0.55, 0.45), 0.8),
+    "glass": ((0.02, 0.05, 0.08), 0.0), "brass": ((0.9, 0.75, 0.4), 0.5),
+}
+
+
+def bake_material(name, mode, image):
+    """구울 값을 그대로 내보내는(emission) 재질. mode는 albedo 또는 orm."""
+    color, metallic, rough = MATERIALS[name]
+    wear_color, wear_amount = WEAR[name]
+    mat = bpy.data.materials.new(f"bake_{mode}_{name}")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    emit = nt.nodes.new("ShaderNodeEmission")
+    nt.links.new(emit.outputs[0], out.inputs[0])
+
+    # 모서리 찾기: 둥글린 노멀(Bevel)과 실제 노멀이 어긋나는 곳이 모서리다.
+    # (Pointiness는 정점 기준이라 면이 큰 로우폴리에서는 면 전체가 모서리로 잡힌다.)
+    geometry = nt.nodes.new("ShaderNodeNewGeometry")
+    rounded = nt.nodes.new("ShaderNodeBevel")
+    rounded.samples = 8
+    rounded.inputs["Radius"].default_value = 0.004
+    dot = nt.nodes.new("ShaderNodeVectorMath")
+    dot.operation = "DOT_PRODUCT"
+    nt.links.new(rounded.outputs["Normal"], dot.inputs[0])
+    nt.links.new(geometry.outputs["Normal"], dot.inputs[1])
+    edge = nt.nodes.new("ShaderNodeMapRange")
+    edge.inputs["From Min"].default_value = 0.995
+    edge.inputs["From Max"].default_value = 0.9
+    edge.clamp = True
+    nt.links.new(dot.outputs["Value"], edge.inputs["Value"])
+    scratch = nt.nodes.new("ShaderNodeTexNoise")
+    scratch.inputs["Scale"].default_value = 140.0
+    scratch.inputs["Detail"].default_value = 6.0
+    breakup = nt.nodes.new("ShaderNodeValToRGB")
+    breakup.color_ramp.elements[0].position = 0.42
+    breakup.color_ramp.elements[1].position = 0.62
+    nt.links.new(scratch.outputs["Fac"], breakup.inputs[0])
+    wear = nt.nodes.new("ShaderNodeMath")
+    wear.operation = "MULTIPLY"
+    nt.links.new(edge.outputs[0], wear.inputs[0])
+    nt.links.new(breakup.outputs[0], wear.inputs[1])
+    wear_scaled = nt.nodes.new("ShaderNodeMath")
+    wear_scaled.operation = "MULTIPLY"
+    wear_scaled.inputs[1].default_value = wear_amount
+    nt.links.new(wear.outputs[0], wear_scaled.inputs[0])
+
+    blotch = nt.nodes.new("ShaderNodeTexNoise")
+    blotch.inputs["Scale"].default_value = 18.0
+    blotch.inputs["Detail"].default_value = 4.0
+    ao = nt.nodes.new("ShaderNodeAmbientOcclusion")
+    ao.inputs["Distance"].default_value = 0.025
+    ao.samples = 16
+
+    if mode == "albedo":
+        tone = nt.nodes.new("ShaderNodeMapRange")
+        tone.inputs["To Min"].default_value = 0.78
+        tone.inputs["To Max"].default_value = 1.22
+        nt.links.new(blotch.outputs["Fac"], tone.inputs["Value"])
+        base = nt.nodes.new("ShaderNodeMixRGB")
+        base.blend_type = "MULTIPLY"
+        base.inputs[0].default_value = 1.0
+        base.inputs[1].default_value = (*color, 1.0)
+        nt.links.new(tone.outputs[0], base.inputs[2])
+        worn = nt.nodes.new("ShaderNodeMixRGB")
+        worn.inputs[2].default_value = (*wear_color, 1.0)
+        nt.links.new(wear_scaled.outputs[0], worn.inputs[0])
+        nt.links.new(base.outputs[0], worn.inputs[1])
+        shade = nt.nodes.new("ShaderNodeMapRange")
+        shade.inputs["To Min"].default_value = 0.45
+        nt.links.new(ao.outputs["AO"], shade.inputs["Value"])
+        final = nt.nodes.new("ShaderNodeMixRGB")
+        final.blend_type = "MULTIPLY"
+        final.inputs[0].default_value = 1.0
+        nt.links.new(worn.outputs[0], final.inputs[1])
+        nt.links.new(shade.outputs[0], final.inputs[2])
+        nt.links.new(final.outputs[0], emit.inputs["Color"])
+    else:
+        # R: AO, G: 러프니스(마모된 곳은 매끈하게, 얼룩으로 조금 흔든다), B: 메탈릭
+        rough_var = nt.nodes.new("ShaderNodeMapRange")
+        rough_var.inputs["To Min"].default_value = max(rough - 0.12, 0.05)
+        rough_var.inputs["To Max"].default_value = min(rough + 0.15, 1.0)
+        nt.links.new(blotch.outputs["Fac"], rough_var.inputs["Value"])
+        rough_worn = nt.nodes.new("ShaderNodeMixRGB")
+        rough_worn.inputs[2].default_value = (0.3, 0.3, 0.3, 1.0)
+        nt.links.new(wear_scaled.outputs[0], rough_worn.inputs[0])
+        nt.links.new(rough_var.outputs[0], rough_worn.inputs[1])
+        metal_worn = nt.nodes.new("ShaderNodeMixRGB")
+        metal_worn.inputs[1].default_value = (metallic,) * 3 + (1.0,)
+        target = 1.0 if name in ("metal", "steel", "brass") else metallic
+        metal_worn.inputs[2].default_value = (target,) * 3 + (1.0,)
+        nt.links.new(wear_scaled.outputs[0], metal_worn.inputs[0])
+        combine = nt.nodes.new("ShaderNodeCombineColor")
+        nt.links.new(ao.outputs["AO"], combine.inputs[0])
+        nt.links.new(rough_worn.outputs[0], combine.inputs[1])
+        nt.links.new(metal_worn.outputs[0], combine.inputs[2])
+        nt.links.new(combine.outputs[0], emit.inputs["Color"])
+
+    target_node = nt.nodes.new("ShaderNodeTexImage")
+    target_node.image = image
+    nt.nodes.active = target_node
+    return mat
+
+
+def texture(root, name):
+    """부품 전체를 한 UV에 펼치고 절차적 재질을 텍스처로 구운 뒤, 구운 재질 하나로 바꾼다."""
+    meshes = [o for o in root.children if o.type == "MESH"]
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in meshes:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = meshes[0]
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.003)
+    bpy.ops.uv.pack_islands(margin=0.003, rotate=True)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = 8
+    scene.render.bake.margin = 6
+    scene.render.bake.use_selected_to_active = False
+    scene.render.bake.use_clear = False
+    images = {}
+    originals = {obj: [slot.material.name for slot in obj.material_slots] for obj in meshes}
+    for mode in ("albedo", "orm"):
+        image = bpy.data.images.new(f"{name}_{mode}", TEXTURE_SIZE, TEXTURE_SIZE, alpha=False)
+        image.colorspace_settings.name = "sRGB" if mode == "albedo" else "Non-Color"
+        images[mode] = image
+        made = {}
+        for obj in meshes:
+            for index, original in enumerate(originals[obj]):
+                if original not in made:
+                    made[original] = bake_material(original, mode, image)
+                obj.material_slots[index].material = made[original]
+        for obj in meshes:
+            bpy.ops.object.select_all(action="DESELECT")
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+            bpy.ops.object.bake(type="EMIT")
+        image.pack()
+
+    final = bpy.data.materials.new(name)
+    final.use_nodes = True
+    nt = final.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    albedo = nt.nodes.new("ShaderNodeTexImage")
+    albedo.image = images["albedo"]
+    orm = nt.nodes.new("ShaderNodeTexImage")
+    orm.image = images["orm"]
+    split = nt.nodes.new("ShaderNodeSeparateColor")
+    nt.links.new(albedo.outputs["Color"], bsdf.inputs["Base Color"])
+    nt.links.new(orm.outputs["Color"], split.inputs[0])
+    nt.links.new(split.outputs[1], bsdf.inputs["Roughness"])
+    nt.links.new(split.outputs[2], bsdf.inputs["Metallic"])
+    for obj in meshes:
+        obj.data.materials.clear()
+        obj.data.materials.append(final)
+        for poly in obj.data.polygons:
+            poly.material_index = 0
+
+
 BUILDERS = {
     "rifle_vk7": build_rifle,
     "smg_kestrel": build_smg,
@@ -447,8 +618,11 @@ def main():
     png_dir = args[args.index("--preview") + 1] if "--preview" in args else ""
     os.makedirs(out_dir, exist_ok=True)
     for name, builder in BUILDERS.items():
+        if os.environ.get("ONLY") and os.environ["ONLY"] != name:
+            continue
         bpy.ops.wm.read_factory_settings(use_empty=True)
         root = builder()
+        texture(root, name)
         tris = 0
         for obj in root.children:
             if obj.type == "MESH":
@@ -457,7 +631,8 @@ def main():
         bpy.ops.object.select_all(action="SELECT")
         path = os.path.join(out_dir, name + ".glb")
         bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True,
-                                  export_yup=True, export_apply=True)
+                                  export_yup=True, export_apply=True,
+                                  export_image_format="JPEG", export_image_quality=85)
         print(f"WEAPON {name} tris={tris} bytes={os.path.getsize(path)}")
         if png_dir:
             os.makedirs(png_dir, exist_ok=True)
