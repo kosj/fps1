@@ -4,13 +4,17 @@ extends RefCounted
 
 const Settings := preload("res://game/core/settings.gd")
 const TEXTURE_DIR := "res://maps/textures/"
-## 종류별 [텍스처 접두어, 1m당 반복 수, 색조].
+## 종류별 [텍스처 접두어, 1m당 반복 수, 색조, (선택) 색 텍스처만 다른 접두어].
+## 컨테이너는 회색으로 바꾼 색 텍스처에 색조를 곱해 여러 색을 낸다.
 const KINDS := {
 	"floor": ["asphalt_02", 0.25, Color(0.85, 0.85, 0.88)],
 	"wall": ["cracked_concrete_wall", 0.45, Color(0.62, 0.62, 0.64)],
-	"container": ["container_side", 0.4, Color(0.7, 0.78, 0.72)],
+	"container": ["container_side", 0.4, Color(0.36, 0.62, 0.42), "container_grey"],
 	"crate": ["plywood", 0.6, Color(0.95, 0.9, 0.8)],
+	"container_blue": ["container_side", 0.4, Color(0.25, 0.42, 0.75), "container_grey"],
+	"container_rust": ["container_side", 0.4, Color(0.72, 0.33, 0.2), "container_grey"],
 	"container_frame": ["container_side", 0.05, Color(0.42, 0.5, 0.45)],
+	"warehouse": ["corrugated_iron_02", 0.18, Color(0.72, 0.74, 0.76)],
 	"crate_frame": ["plywood", 0.9, Color(0.62, 0.52, 0.4)],
 }
 const PROP_DIR := "res://maps/props/"
@@ -25,7 +29,8 @@ static func material(kind: String) -> StandardMaterial3D:
 	var prefix: String = TEXTURE_DIR + str(spec[0])
 	var result := StandardMaterial3D.new()
 	result.albedo_color = spec[2]
-	result.albedo_texture = load(prefix + "_diff.jpg")
+	var color_prefix: String = TEXTURE_DIR + str(spec[3]) if spec.size() > 3 else prefix
+	result.albedo_texture = load(color_prefix + "_diff.jpg")
 	result.uv1_triplanar = true
 	result.uv1_world_triplanar = true
 	result.uv1_scale = Vector3.ONE * float(spec[1])
@@ -50,16 +55,18 @@ static func material(kind: String) -> StandardMaterial3D:
 ## 종류와 크기에 맞는 엄폐물 모델을 돌려준다. 그 크기의 모델이 없으면 null(상자로 대신한다).
 ## 모델의 재질 슬롯 panel, frame을 이 모음의 재질로 바꿔 끼운다.
 static func prop(kind: String, size: Vector3) -> Node3D:
+	# container_blue 같은 색 변형은 container 모델과 테두리 재질을 같이 쓴다.
+	var base := kind.get_slice("_", 0)
 	var path := "%s%s_%d_%d_%d.glb" % [
-		PROP_DIR, kind, roundi(size.x * 100.0), roundi(size.y * 100.0), roundi(size.z * 100.0)
+		PROP_DIR, base, roundi(size.x * 100.0), roundi(size.y * 100.0), roundi(size.z * 100.0)
 	]
-	if not KINDS.has(kind + "_frame") or not ResourceLoader.exists(path):
+	if not KINDS.has(base + "_frame") or not ResourceLoader.exists(path):
 		return null
 	var node := (load(path) as PackedScene).instantiate() as Node3D
 	for found in node.find_children("*", "MeshInstance3D", true, false):
 		var mesh_instance := found as MeshInstance3D
 		for surface in mesh_instance.mesh.get_surface_count():
 			var slot := mesh_instance.mesh.surface_get_material(surface).resource_name
-			var which := kind + "_frame" if slot == "frame" else kind
+			var which := base + "_frame" if slot == "frame" else kind
 			mesh_instance.set_surface_override_material(surface, material(which))
 	return node
