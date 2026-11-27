@@ -8,6 +8,7 @@
 script = ExtResource("1_data")
 model = ExtResource("2_model")
 shot_sound = ExtResource("3_shot")
+support_point = Vector3(0, -0.065, -0.36)
 sight_height = 0.056
 aim_distance = 0.13
 hide_when_aimed = false

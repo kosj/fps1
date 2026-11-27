@@ -13,6 +13,14 @@ const MUZZLE_POSITION := Vector3(0.0, 0.0, -0.72)
 const FLASH_TIME := 0.045
 const MAG_DROP := Vector3(0.0, -0.22, 0.03)
 const ACTION_TRAVEL := 0.035
+const ARMS := preload("res://game/weapons/models/arms.glb")
+## 팔꿈치 위치(총 원점 기준). 손목에서 이쪽으로 팔이 뻗는다.
+const ELBOW_RIGHT := Vector3(0.14, -0.3, 0.5)
+const ELBOW_LEFT := Vector3(-0.3, -0.15, 0.2)
+## 손목 축을 기준으로 손을 돌리는 각도(도). 오른손은 손잡이를 쥐게 세우고, 왼손은 손바닥이 위로.
+const ARM_TINT := Color(0.5, 0.52, 0.44)
+const ROLL_RIGHT := -80.0
+const ROLL_LEFT := 165.0
 
 var aim_blend := 0.0
 var sprint_target := 0.0
@@ -30,6 +38,9 @@ var _muzzle_light: OmniLight3D
 var _muzzle_mesh: MeshInstance3D
 var _model: Node3D
 var _placeholder: Node3D
+var _arm_right: Node3D
+var _arm_left: Node3D
+var _left_rest_y := 0.0
 var _mag: Node3D
 var _action: Node3D
 var _mag_rest := Vector3.ZERO
@@ -69,6 +80,7 @@ func set_weapon(data: Resource) -> void:
 	if _muzzle_mesh != null:
 		_muzzle_mesh.position = muzzle_at
 		_muzzle_light.position = muzzle_at
+	_place_arms(data.get("grip_point"), data.get("support_point"))
 	_ads_position = Vector3(0.0, -float(data.get("sight_height")), -float(data.get("aim_distance")))
 	_hide_when_aimed = bool(data.get("hide_when_aimed"))
 
@@ -122,8 +134,14 @@ func _process(delta: float) -> void:
 		_mag.position = _mag_rest + MAG_DROP * reload_curve
 	if _action != null:
 		_action.position = _action_rest + Vector3(0.0, 0.0, ACTION_TRAVEL * _action_kick)
+	var shown := not (_hide_when_aimed and aim_blend > 0.85)
 	if _model != null:
-		_model.visible = not (_hide_when_aimed and aim_blend > 0.85)
+		_model.visible = shown
+	if _arm_right != null:
+		_arm_right.visible = shown
+		# 왼손은 재장전 때 탄창을 따라 내려갔다 올라온다.
+		_arm_left.visible = shown
+		_arm_left.position.y = _left_rest_y + MAG_DROP.y * 0.8 * reload_curve
 
 	_flash_left = maxf(_flash_left - delta, 0.0)
 	var flashing := _flash_left > 0.0
@@ -149,6 +167,35 @@ func _build_placeholder_rifle() -> void:
 	_add_part(Vector3(0.0, -0.01, 0.22), Vector3(0.05, 0.1, 0.26), polymer, _placeholder)
 	_add_part(Vector3(0.0, 0.06, 0.04), Vector3(0.012, 0.03, 0.012), metal, _placeholder)
 	_add_part(Vector3(0.0, 0.06, -0.38), Vector3(0.008, 0.03, 0.008), metal, _placeholder)
+
+
+func _place_arms(grip: Vector3, support: Vector3) -> void:
+	if _arm_right == null:
+		var arms := ARMS.instantiate() as Node3D
+		add_child(arms)
+		_arm_right = arms.find_child("arm_r", true, false) as Node3D
+		_arm_left = arms.find_child("arm_l", true, false) as Node3D
+		for found in arms.find_children("*", "MeshInstance3D", true, false):
+			var mesh := found as MeshInstance3D
+			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			# 밝은 회색 군복 텍스처를 어두운 국방색으로 눌러 총과 어울리게 한다.
+			var material := mesh.mesh.surface_get_material(0).duplicate() as StandardMaterial3D
+			material.albedo_color = ARM_TINT
+			mesh.set_surface_override_material(0, material)
+	_aim_arm(_arm_right, ELBOW_RIGHT, grip, ROLL_RIGHT)
+	_aim_arm(_arm_left, ELBOW_LEFT, support, ROLL_LEFT)
+	_left_rest_y = _arm_left.position.y if _arm_left != null else 0.0
+
+
+## 팔 모델(원점이 손목, -Z가 손끝 방향)을 팔꿈치에서 손 위치로 뻗게 놓는다.
+func _aim_arm(arm: Node3D, elbow: Vector3, hand: Vector3, roll_deg: float) -> void:
+	if arm == null:
+		return
+	var forward := (hand - elbow).normalized()
+	var side := forward.cross(Vector3.UP).normalized()
+	var up := side.cross(forward)
+	var basis := Basis(side, up, -forward).rotated(forward, deg_to_rad(roll_deg))
+	arm.transform = Transform3D(basis, hand)
 
 
 func _build_muzzle_flash() -> void:
