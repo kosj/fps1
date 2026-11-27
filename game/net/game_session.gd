@@ -101,6 +101,7 @@ var _last_local_health := Protocol.MAX_HEALTH
 var _domination: Domination
 var _view := MatchView.new()
 var _difficulty := "normal"
+var _capture_check_left := 0.0
 # 클라이언트 전용
 var _seq := 0
 ## 아직 서버 확인을 받지 못한 입력. 각 항목은 [seq, 입력, 그 입력을 적용한 뒤의 예측 상태].
@@ -214,6 +215,7 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 	_pause.resume_requested.connect(_resume)
 	_pause.menu_requested.connect(_return_to_menu)
 	_pause.sensitivity_changed.connect(_on_sensitivity_changed)
+	_pause.touch_toggled.connect(_on_touch_toggled)
 	add_child(_pause)
 
 
@@ -261,6 +263,31 @@ func _resume() -> void:
 		_local.set_paused(false)
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		_capture_check_left = 0.4
+
+
+func _on_touch_toggled(enabled: bool) -> void:
+	if _local == null:
+		return
+	if enabled:
+		_local.enable_touch()
+		_local.set_paused(true)
+	else:
+		_local.disable_touch()
+
+
+## 계속하기를 눌렀는데도 포인터 잠금이 되지 않고 터치 화면이 있으면, 휴대폰으로 보고 터치 조작을 켠다.
+## 기기 판단이 틀렸을 때 일시 정지 화면에 갇히지 않게 하는 안전장치다.
+func _check_capture_fallback(delta: float) -> void:
+	if _capture_check_left <= 0.0:
+		return
+	_capture_check_left -= delta
+	if _capture_check_left > 0.0 or _local == null or _local.touch != null:
+		return
+	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+	if not captured and DisplayServer.is_touchscreen_available():
+		_local.enable_touch()
+		_local.set_paused(false)
 
 
 func _on_sensitivity_changed(value: float) -> void:
@@ -296,7 +323,8 @@ func _physics_process(delta: float) -> void:
 		_finish()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_check_capture_fallback(delta)
 	if _pause != null:
 		# 접속이 끝나기 전(_local 없음)에도 메뉴로 돌아갈 수 있게 보여 준다.
 		_pause.visible = _local == null or not _local.input_active()

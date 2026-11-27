@@ -8,6 +8,8 @@ const SERVER_ADDRESS := "match/server_address"
 const GAME_MODE := "match/mode"
 const DIFFICULTY := "match/difficulty"
 const LOW_GRAPHICS := "video/low"
+## 터치 조작: "auto"(기기를 보고 판단), "on", "off".
+const TOUCH_MODE := "input/touch"
 const UI_SCALE := "ui/scale"
 const MIN_UI_SCALE := 0.8
 const MAX_UI_SCALE := 2.0
@@ -43,10 +45,26 @@ static func is_mobile() -> bool:
 		mobile = mobile or OS.has_feature("web_android") or OS.has_feature("web_ios")
 		if not mobile and OS.has_feature("web"):
 			# 엔진이 기기를 구분하지 못하는 브라우저를 위해, 주 입력 장치가 손가락인지 직접 묻는다.
-			var script := "(navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches) ? 1 : 0"
-			mobile = int(JavaScriptBridge.eval(script, true)) == 1
+			var coarse := "(navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches)"
+			var agent := "/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)"
+			mobile = int(JavaScriptBridge.eval("(%s || %s) ? 1 : 0" % [coarse, agent], true)) == 1
 		_mobile = 1 if mobile else 0
 	return _mobile == 1
+
+
+## 터치 조작을 켤지. 사용자가 직접 정했으면 그 값을, 아니면 기기 판단을 따른다.
+static func touch_enabled() -> bool:
+	var choice := str(read(TOUCH_MODE, "auto"))
+	if choice == "on":
+		return true
+	if choice == "off":
+		return false
+	return is_mobile()
+
+
+## 빌드 번호. 배포할 때 커밋 번호가 들어가며, 어떤 버전을 보고 있는지 확인하는 데 쓴다.
+static func build_version() -> String:
+	return str(ProjectSettings.get_setting("application/config/version", "dev"))
 
 
 static func ui_scale() -> float:

@@ -90,6 +90,24 @@ static func _apply_ui_scale(value: float, readout: Label, tree: SceneTree) -> vo
 	tree.root.content_scale_factor = value
 
 
+## 터치 조작 켜기/끄기. 자동 판단이 틀렸을 때 직접 바꿀 수 있다.
+static func touch_toggle(on_change: Callable) -> CheckButton:
+	var toggle := CheckButton.new()
+	toggle.text = "Touch controls"
+	toggle.add_theme_font_size_override("font_size", 18)
+	toggle.button_pressed = Settings.touch_enabled()
+	toggle.toggled.connect(
+		func(enabled: bool) -> void: _apply_touch(enabled, on_change)
+	)
+	return toggle
+
+
+static func _apply_touch(enabled: bool, on_change: Callable) -> void:
+	Settings.write(Settings.TOUCH_MODE, "on" if enabled else "off")
+	if on_change.is_valid():
+		on_change.call(enabled)
+
+
 static func _apply_sensitivity(value: float, readout: Label, on_change: Callable) -> void:
 	readout.text = "%.2f" % value
 	Settings.write(Settings.SENSITIVITY, value)

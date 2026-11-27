@@ -60,6 +60,11 @@ jobs:
           mv /tmp/templates/templates \
             ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}
 
+      - name: Stamp the build version
+        run: |
+          sed -i "s|^config/name=\"FPS1\"|config/name=\"FPS1\"\nconfig/version=\"${GITHUB_SHA::7}\"|" project.godot
+          grep -n "config/version" project.godot
+
       - name: Import project
         run: |
           chmod +x ~/godot/godot
@@ -127,8 +132,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          rm -rf /tmp/site && cp -r build/web /tmp/site
+          # 빌드마다 주소가 달라지도록 버전 폴더에 넣는다. 브라우저가 예전 파일을 캐시에서 꺼내 쓰지 못한다.
+          VERSION="${GITHUB_SHA::7}"
+          rm -rf /tmp/site && mkdir -p "/tmp/site/v/$VERSION"
+          cp -r build/web/. "/tmp/site/v/$VERSION/"
           cd /tmp/site
+          cat > index.html <<HTML
+          <!doctype html>
+          <meta charset="utf-8">
+          <meta http-equiv="cache-control" content="no-cache">
+          <title>FPS1</title>
+          <script>location.replace("v/$VERSION/index.html" + location.search)</script>
+          HTML
           touch .nojekyll
           git init -q -b gh-pages
           git config user.name "github-actions[bot]"

@@ -118,7 +118,7 @@ func _ready() -> void:
 	if is_local:
 		hud.set_health(health, MAX_HEALTH)
 		sensitivity_scale = Settings.sensitivity()
-		if Settings.is_mobile() and not view_from_cmd:
+		if Settings.touch_enabled() and not view_from_cmd:
 			enable_touch()
 
 
@@ -138,6 +138,14 @@ func enable_touch() -> void:
 	hud.use_touch_layout()
 	touch.look.connect(_on_touch_look)
 	touch.pause_pressed.connect(set_paused.bind(true))
+
+
+func disable_touch() -> void:
+	if touch == null:
+		return
+	touch.queue_free()
+	touch = null
+	_touch_paused = false
 
 
 ## 터치 조작에서의 일시 정지. 마우스 조작은 포인터 잠금 여부로 판단하므로 영향받지 않는다.
@@ -328,7 +336,9 @@ func show_hit(headshot: bool, killed: bool) -> void:
 
 func _input(event: InputEvent) -> void:
 	# 터치를 감지하면 그때부터 터치 조작으로 바꾼다(태블릿, 터치 노트북).
-	if touch == null and is_local and not view_from_cmd and event is InputEventScreenTouch:
+	if touch != null or not is_local or view_from_cmd or not event is InputEventScreenTouch:
+		return
+	if str(Settings.read(Settings.TOUCH_MODE, "auto")) != "off":
 		enable_touch()
 
 
