@@ -118,8 +118,8 @@ func _ready() -> void:
 	if is_local:
 		hud.set_health(health, MAX_HEALTH)
 		sensitivity_scale = Settings.sensitivity()
-		if Settings.is_mobile() and not view_from_cmd:
-			enable_touch()
+		if Settings.touch_enabled() and not view_from_cmd:
+			set_touch(true)
 
 
 ## 입력을 받아도 되는 상태인지. 브라우저에서는 클릭으로 포인터를 잠근 뒤부터 조작한다.
@@ -129,8 +129,14 @@ func input_active() -> bool:
 	return not require_mouse_capture or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
-## 터치 조작을 켠다. 휴대폰에서는 시작할 때, 그 밖의 터치 기기에서는 처음 화면을 만졌을 때 켜진다.
-func enable_touch() -> void:
+## 터치 조작을 켜거나 끈다. 휴대폰에서는 시작할 때, 그 밖의 터치 기기에서는 처음 화면을 만졌을 때 켜진다.
+func set_touch(enabled: bool) -> void:
+	if not enabled:
+		if touch != null:
+			touch.queue_free()
+			touch = null
+			_touch_paused = false
+		return
 	if touch != null or not is_local:
 		return
 	touch = TouchControls.new()
@@ -328,8 +334,10 @@ func show_hit(headshot: bool, killed: bool) -> void:
 
 func _input(event: InputEvent) -> void:
 	# 터치를 감지하면 그때부터 터치 조작으로 바꾼다(태블릿, 터치 노트북).
-	if touch == null and is_local and not view_from_cmd and event is InputEventScreenTouch:
-		enable_touch()
+	if touch != null or not is_local or view_from_cmd or not event is InputEventScreenTouch:
+		return
+	if str(Settings.read(Settings.TOUCH_MODE, "auto")) != "off":
+		set_touch(true)
 
 
 func _on_touch_look(relative: Vector2) -> void:

@@ -80,6 +80,10 @@ func _ready() -> void:
 
 	column.add_child(MenuKit.sensitivity_row(Callable()))
 	column.add_child(MenuKit.ui_scale_row(get_tree()))
+	column.add_child(MenuKit.touch_toggle(Callable()))
+	var device := "mobile" if Settings.is_mobile() else "desktop"
+	var info := "build %s  |  detected: %s" % [Settings.build_version(), device]
+	column.add_child(MenuKit.label(info, 14))
 	if not OS.has_feature("web"):
 		var quit_button := MenuKit.button("QUIT")
 		quit_button.pressed.connect(func() -> void: get_tree().quit())

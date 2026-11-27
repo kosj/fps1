@@ -5,6 +5,7 @@ extends CanvasLayer
 signal resume_requested
 signal menu_requested
 signal sensitivity_changed(value: float)
+signal touch_toggled(enabled: bool)
 
 const MenuKit := preload("res://game/ui/menu_kit.gd")
 const Settings := preload("res://game/core/settings.gd")
@@ -24,6 +25,7 @@ func _ready() -> void:
 		MenuKit.sensitivity_row(func(value: float) -> void: sensitivity_changed.emit(value))
 	)
 	column.add_child(MenuKit.ui_scale_row(get_tree()))
+	column.add_child(MenuKit.touch_toggle(func(enabled: bool) -> void: touch_toggled.emit(enabled)))
 	if Settings.is_mobile():
 		column.add_child(MenuKit.label("Left side: move (push fully forward to sprint)", 18))
 		column.add_child(MenuKit.label("Right side or FIRE: drag to look", 18))
