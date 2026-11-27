@@ -112,6 +112,19 @@ jobs:
       - name: Run prediction test (sprint, slide, jump under 80 ms delay)
         run: GODOT=~/godot/godot PORT=7790 tests/net/run_net_test.sh prediction
 
+      # 서버 컨테이너 이미지(Dockerfile)가 실제로 떠서 접속을 받는지 확인한다. Render 배포와 같은 이미지다.
+      - name: Build and test the server container
+        run: |
+          docker build -q -t fps1-server .
+          docker run -d --name fps1-server -p 10000:10000 -e BOTS=2 fps1-server
+          sleep 15
+          timeout 120 ~/godot/godot --headless -- --connect=127.0.0.1:10000 --bot=shooter \
+            --exit-after=20 2>&1 | tee container.log
+          docker logs fps1-server 2>&1 | tail -20
+          docker rm -f fps1-server
+          grep -q "NETTEST client:shooter ok" container.log
+          ! grep -q "SCRIPT ERROR" container.log
+
       - name: Export Windows
         run: |
           mkdir -p build/windows
