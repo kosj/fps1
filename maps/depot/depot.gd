@@ -152,18 +152,20 @@ func _mirror(point: Vector3) -> Vector3:
 
 
 func _add_box(center: Vector3, size: Vector3, kind: String) -> void:
-	var material := Surfaces.material(kind)
 	var body := StaticBody3D.new()
 	body.position = center
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh.material = material
-	var mesh_instance := MeshInstance3D.new()
-	mesh_instance.mesh = mesh
+	var visual := Surfaces.prop(kind, size)
+	if visual == null:
+		var mesh := BoxMesh.new()
+		mesh.size = size
+		mesh.material = Surfaces.material(kind)
+		var mesh_instance := MeshInstance3D.new()
+		mesh_instance.mesh = mesh
+		visual = mesh_instance
 	var shape := BoxShape3D.new()
 	shape.size = size
 	var collision := CollisionShape3D.new()
 	collision.shape = shape
-	body.add_child(mesh_instance)
+	body.add_child(visual)
 	body.add_child(collision)
 	add_child(body)

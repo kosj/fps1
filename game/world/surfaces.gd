@@ -10,7 +10,10 @@ const KINDS := {
 	"wall": ["cracked_concrete_wall", 0.45, Color(0.62, 0.62, 0.64)],
 	"container": ["container_side", 0.4, Color(0.7, 0.78, 0.72)],
 	"crate": ["plywood", 0.6, Color(0.95, 0.9, 0.8)],
+	"container_frame": ["container_side", 0.05, Color(0.42, 0.5, 0.45)],
+	"crate_frame": ["plywood", 0.9, Color(0.62, 0.52, 0.4)],
 }
+const PROP_DIR := "res://maps/props/"
 
 static var _cache := {}
 
@@ -42,3 +45,21 @@ static func material(kind: String) -> StandardMaterial3D:
 		result.metallic_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_BLUE
 	_cache[kind] = result
 	return result
+
+
+## 종류와 크기에 맞는 엄폐물 모델을 돌려준다. 그 크기의 모델이 없으면 null(상자로 대신한다).
+## 모델의 재질 슬롯 panel, frame을 이 모음의 재질로 바꿔 끼운다.
+static func prop(kind: String, size: Vector3) -> Node3D:
+	var path := "%s%s_%d_%d_%d.glb" % [
+		PROP_DIR, kind, roundi(size.x * 100.0), roundi(size.y * 100.0), roundi(size.z * 100.0)
+	]
+	if not KINDS.has(kind + "_frame") or not ResourceLoader.exists(path):
+		return null
+	var node := (load(path) as PackedScene).instantiate() as Node3D
+	for found in node.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := found as MeshInstance3D
+		for surface in mesh_instance.mesh.get_surface_count():
+			var slot := mesh_instance.mesh.surface_get_material(surface).resource_name
+			var which := kind + "_frame" if slot == "frame" else kind
+			mesh_instance.set_surface_override_material(surface, material(which))
+	return node
