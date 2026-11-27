@@ -14,6 +14,9 @@ const FLASH_TIME := 0.045
 const MAG_DROP := Vector3(0.0, -0.22, 0.03)
 const ACTION_TRAVEL := 0.035
 const ARMS := preload("res://game/weapons/models/arms.glb")
+const Effects := preload("res://game/fx/effects.gd")
+const EJECT_TIME := 0.09
+const EJECT_PORT := Vector3(0.03, 0.02, -0.08)
 ## 팔꿈치 위치(총 원점 기준). 손목에서 이쪽으로 팔이 뻗는다.
 const ELBOW_RIGHT := Vector3(0.14, -0.3, 0.5)
 const ELBOW_LEFT := Vector3(-0.3, -0.15, 0.2)
@@ -35,7 +38,9 @@ var _reload_left := 0.0
 var _reload_total := 1.0
 var _flash_left := 0.0
 var _muzzle_light: OmniLight3D
-var _muzzle_mesh: MeshInstance3D
+var _muzzle_mesh: Node3D
+var _shells: CPUParticles3D
+var _eject_left := 0.0
 var _model: Node3D
 var _placeholder: Node3D
 var _arm_right: Node3D
@@ -99,6 +104,8 @@ func kick(kick_deg: Vector2) -> void:
 	_rotation_spring.add_impulse(Vector3(pitch, yaw, 0.0) * factor)
 	_flash_left = FLASH_TIME
 	_action_kick = 1.0
+	_eject_left = EJECT_TIME
+	Effects.show_flash(_muzzle_mesh)
 
 
 func play_reload(duration: float) -> void:
@@ -146,6 +153,8 @@ func _process(delta: float) -> void:
 	_flash_left = maxf(_flash_left - delta, 0.0)
 	var flashing := _flash_left > 0.0
 	_muzzle_mesh.visible = flashing
+	_eject_left = maxf(_eject_left - delta, 0.0)
+	_shells.emitting = _eject_left > 0.0
 	_muzzle_light.light_energy = 2.5 if flashing else 0.0
 
 
@@ -167,6 +176,11 @@ func _build_placeholder_rifle() -> void:
 	_add_part(Vector3(0.0, -0.01, 0.22), Vector3(0.05, 0.1, 0.26), polymer, _placeholder)
 	_add_part(Vector3(0.0, 0.06, 0.04), Vector3(0.012, 0.03, 0.012), metal, _placeholder)
 	_add_part(Vector3(0.0, 0.06, -0.38), Vector3(0.008, 0.03, 0.008), metal, _placeholder)
+
+
+## 총구의 월드 위치. 예광탄의 출발점으로 쓴다.
+func muzzle_global() -> Vector3:
+	return _muzzle_mesh.global_position if _muzzle_mesh != null else global_position
 
 
 func _place_arms(grip: Vector3, support: Vector3) -> void:
@@ -199,11 +213,12 @@ func _aim_arm(arm: Node3D, elbow: Vector3, hand: Vector3, roll_deg: float) -> vo
 
 
 func _build_muzzle_flash() -> void:
-	var flash_material := StandardMaterial3D.new()
-	flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	flash_material.albedo_color = Color(1.0, 0.85, 0.45)
-	_muzzle_mesh = _add_part(MUZZLE_POSITION, Vector3(0.07, 0.07, 0.07), flash_material)
-	_muzzle_mesh.visible = false
+	_muzzle_mesh = Effects.muzzle_flash()
+	_muzzle_mesh.position = MUZZLE_POSITION
+	add_child(_muzzle_mesh)
+	_shells = Effects.shell_ejector()
+	_shells.position = EJECT_PORT
+	add_child(_shells)
 
 	_muzzle_light = OmniLight3D.new()
 	_muzzle_light.position = MUZZLE_POSITION

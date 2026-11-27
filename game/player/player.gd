@@ -18,6 +18,7 @@ const Hud := preload("res://game/ui/hud.gd")
 const TouchControls := preload("res://game/ui/touch_controls.gd")
 const AimAssist := preload("res://game/player/aim_assist.gd")
 const SfxSynth := preload("res://game/audio/sfx_synth.gd")
+const Effects := preload("res://game/fx/effects.gd")
 ## ElevenLabs로 만든 효과음. 맞음/처치 알림음은 짧은 합성음을 그대로 쓴다.
 const SFX_DRY := preload("res://game/audio/sfx/dry.ogg")
 const SFX_RELOAD := preload("res://game/audio/sfx/reload.ogg")
@@ -48,7 +49,6 @@ const CROUCH_EYE := 0.95
 const SLIDE_EYE := 0.8
 const MANTLE_REACH := 0.7
 const FOOTSTEP_DISTANCE := 2.2
-const IMPACT_LIFETIME := 4.0
 const WORLD_MASK := 1
 const BODY_LAYER := 2
 const MAX_HEALTH := 100.0
@@ -92,7 +92,6 @@ var _damage_sources: Array = []
 var _step_distance := 0.0
 var _shape: CapsuleShape3D
 var _sounds := {}
-var _impact_mesh := SphereMesh.new()
 var _button_actions := {
 	"jump": InputCmd.JUMP,
 	"sprint": InputCmd.SPRINT,
@@ -557,8 +556,6 @@ func _update_footsteps(delta: float) -> void:
 
 
 func _build_view() -> void:
-	_impact_mesh.radius = 0.035
-	_impact_mesh.height = 0.07
 	_add_sound("shot", SfxSynth.gunshot(), 6, -4.0)
 	_add_sound("hit", SfxSynth.tone(1800.0, 0.06, 45.0), 4, -6.0)
 	_add_sound("headshot", SfxSynth.tone(2600.0, 0.08, 40.0), 4, -5.0)
@@ -599,20 +596,16 @@ func _on_fired(kick_deg: Vector2) -> void:
 	_play("shot")
 
 
-func _on_impact(point: Vector3, _normal: Vector3) -> void:
-	var marker := MeshInstance3D.new()
-	marker.mesh = _impact_mesh
-	marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	get_parent().add_child(marker)
-	marker.global_position = point
-	get_tree().create_timer(IMPACT_LIFETIME).timeout.connect(marker.queue_free)
-	# 탄착음은 맞은 자리에서 난다. 표시가 사라질 때 함께 정리된다.
+func _on_impact(point: Vector3, normal: Vector3) -> void:
+	Effects.tracer(get_parent(), view_model.muzzle_global(), point)
+	var mark := Effects.impact(get_parent(), point, normal)
+	# 탄착음은 맞은 자리에서 난다. 탄흔이 사라질 때 함께 정리된다.
 	var sound := AudioStreamPlayer3D.new()
 	sound.stream = SFX_IMPACT
 	sound.unit_size = 6.0
 	sound.max_distance = 60.0
 	sound.pitch_scale = randf_range(0.9, 1.15)
-	marker.add_child(sound)
+	mark.add_child(sound)
 	sound.play()
 
 
