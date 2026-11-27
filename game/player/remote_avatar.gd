@@ -1,15 +1,25 @@
 extends Node3D
 ## 다른 플레이어의 모습. 서버 스냅샷을 버퍼에 쌓고 조금 과거 시점으로 보간해 부드럽게 그린다.
-## 모델은 tools/asset_pipeline/build_soldier.py로 만든 관절별 부품이고,
-## 걷기·앉기·총 드는 자세는 부품 회전으로 만든다(game/player/avatar_pose.gd).
+## 모델과 동작은 Varco 3D로 만든 병사(리깅 + 소총 동작 8종)를
+## tools/asset_pipeline/merge_character.py로 합친 것이다.
 
 const HitMath := preload("res://game/combat/hit_math.gd")
-const AvatarPose := preload("res://game/player/avatar_pose.gd")
 const SOLDIER := preload("res://game/player/models/soldier.glb")
 const RIFLE := preload("res://game/weapons/models/rifle_vk7.glb")
 const SHOT_SOUND := preload("res://game/audio/sfx/shot_rifle.ogg")
 const MAX_SAMPLES := 40
-const UNIFORM_SLOT := "uniform"
+## 모델 원본 키(약 1m)를 히트 판정 키에 맞추는 배율.
+const MODEL_HEIGHT := 1.0
+const BLEND_TIME := 0.18
+const MOVE_THRESHOLD := 0.6
+## 달리기 동작이 만들어진 기준 속도(m/s). 실제 속도에 맞춰 재생 속도를 바꾼다.
+const RUN_CLIP_SPEED := 4.5
+const CROUCH_CLIP_SPEED := 1.6
+const DEATH_SHOW_TIME := 3.2
+const GRIP_BONE := "RightHand"
+const SUPPORT_BONE := "LeftHand"
+## 손목 뼈에서 총 원점(방아쇠 위 총열 축)까지: [총구 방향, 위쪽] (m).
+const GRIP_OFFSET := Vector2(0.1, 0.07)
 
 var alive := true
 var low := false
@@ -17,11 +27,18 @@ var low := false
 ## 각 항목은 [서버 틱, 위치, yaw, low, alive].
 var _samples: Array = []
 var _model: Node3D
-var _pose: AvatarPose
-var _material := StandardMaterial3D.new()
+var _animation: AnimationPlayer
+var _material: StandardMaterial3D
+var _tint := Color(0.75, 0.25, 0.2)
 var _shot_audio: AudioStreamPlayer3D
 var _last_position := Vector3.ZERO
 var _has_last := false
+var _skeleton: Skeleton3D
+var _rifle: Node3D
+var _grip_bone := -1
+var _support_bone := -1
+var _shown_alive := true
+var _death_left := 0.0
 
 
 func _ready() -> void:
@@ -29,34 +46,60 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if _pose == null or not visible:
+	if _animation == null:
 		return
-	# 보간된 위치(또는 붙어 있는 플레이어)의 실제 이동에서 속도를 구해 걸음을 맞춘다.
+	if _shown_alive != alive:
+		_shown_alive = alive
+		_has_last = false
+		if alive:
+			visible = true
+		else:
+			_death_left = DEATH_SHOW_TIME
+			_play("death", 1.0)
+		if _rifle != null:
+			_rifle.visible = alive
+	if not alive:
+		# 쓰러지는 동작을 보여 준 뒤 사라진다.
+		_death_left -= delta
+		if _death_left <= 0.0:
+			visible = false
+		return
+	# 보간된 위치(또는 붙어 있는 플레이어)의 실제 이동에서 속도를 구해 동작을 고른다.
 	var now := global_position
-	var speed := 0.0
+	var velocity := Vector3.ZERO
 	if _has_last and delta > 0.0:
-		speed = Vector2(now.x - _last_position.x, now.z - _last_position.z).length() / delta
+		velocity = (now - _last_position) / delta
 	_last_position = now
 	_has_last = true
-	_pose.update(delta, speed, low)
+	var local := global_transform.basis.inverse() * velocity
+	_play_movement(Vector2(local.x, local.z))
+	_hold_rifle()
 
 
 ## 모델을 만든다. 트리에 넣지 않고 쓰는 테스트에서도 호출할 수 있다.
 func build() -> void:
 	if _model != null:
 		return
-	_material.albedo_color = Color(0.75, 0.25, 0.2)
-	_material.roughness = 0.85
 	_model = SOLDIER.instantiate() as Node3D
+	# 모델은 +z를 보고 만들어졌고 게임의 정면은 -z다.
+	_model.rotation.y = PI
+	_model.scale = Vector3.ONE * (HitMath.STAND_HEIGHT / MODEL_HEIGHT)
 	add_child(_model)
+	_animation = _model.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	for found in _model.find_children("*", "MeshInstance3D", true, false):
 		var part := found as MeshInstance3D
-		for surface in part.mesh.get_surface_count():
-			if part.mesh.surface_get_material(surface).resource_name == UNIFORM_SLOT:
-				part.set_surface_override_material(surface, _material)
-	_pose = AvatarPose.new()
-	_pose.bind(_model, RIFLE.instantiate() as Node3D)
-	_pose.update(0.0, 0.0, low)
+		# 회색 군복 텍스처에 팀 색을 곱한다. 아바타마다 색이 달라야 하므로 재질을 복제한다.
+		_material = (part.mesh.surface_get_material(0) as StandardMaterial3D).duplicate()
+		part.set_surface_override_material(0, _material)
+	set_color(_tint)
+	_skeleton = _model.find_child("Skeleton3D", true, false) as Skeleton3D
+	if _skeleton != null:
+		_grip_bone = _skeleton.find_bone(GRIP_BONE)
+		_support_bone = _skeleton.find_bone(SUPPORT_BONE)
+	if _grip_bone >= 0 and _support_bone >= 0:
+		_rifle = RIFLE.instantiate() as Node3D
+		add_child(_rifle)
+	_play("idle", 1.0)
 	# 거리와 방향이 들리는 3D 총소리. 적의 위치를 귀로 알 수 있게 한다.
 	_shot_audio = AudioStreamPlayer3D.new()
 	_shot_audio.stream = SHOT_SOUND
@@ -73,13 +116,15 @@ func play_shot() -> void:
 
 
 func set_color(color: Color) -> void:
-	_material.albedo_color = color
+	_tint = color
+	if _material != null:
+		# 텍스처 디테일이 남도록 팀 색을 밝게 섞어 곱한다.
+		_material.albedo_color = color.lerp(Color.WHITE, 0.25)
 
 
 ## 보간 없이 자세만 바로 반영한다. 같은 프로세스에 있는 플레이어(봇)에 붙여 쓸 때 사용한다.
 func set_pose(is_low: bool, is_alive: bool) -> void:
 	alive = is_alive
-	visible = is_alive
 	low = is_low
 
 
@@ -113,5 +158,52 @@ func sample(render_tick: float) -> void:
 	position = from.lerp(to, weight)
 	rotation.y = lerp_angle(float(older[2]), float(newer[2]), weight)
 	alive = older[4]
-	visible = alive
 	low = older[3]
+
+
+## local은 아바타 기준 수평 속도(x: 오른쪽, y: 뒤쪽이 +).
+func _play_movement(local: Vector2) -> void:
+	var speed := local.length()
+	if low:
+		if speed > MOVE_THRESHOLD:
+			_play("crouch_walk", clampf(speed / CROUCH_CLIP_SPEED, 0.6, 2.0))
+		else:
+			_play("crouch_idle", 1.0)
+		return
+	if speed <= MOVE_THRESHOLD:
+		_play("idle", 1.0)
+		return
+	var clip := "run_f"
+	if absf(local.x) > absf(local.y):
+		clip = "run_r" if local.x > 0.0 else "run_l"
+	elif local.y > 0.0:
+		clip = "run_b"
+	_play(clip, clampf(speed / RUN_CLIP_SPEED, 0.5, 1.8))
+
+
+func _play(clip: String, speed: float) -> void:
+	if not _animation.has_animation(clip):
+		return
+	if _animation.current_animation != clip:
+		_animation.play(clip, BLEND_TIME)
+	_animation.speed_scale = speed
+
+
+## 총을 오른손(손잡이)에 두고 왼손(총열 덮개) 쪽을 향하게 한다.
+## 동작마다 손 위치가 달라도 두 손을 잇는 선에 총이 놓이므로 뼈별 각도 보정이 필요 없다.
+func _hold_rifle() -> void:
+	if _rifle == null or not is_inside_tree():
+		return
+	var base := _skeleton.global_transform
+	var grip := base * _skeleton.get_bone_global_pose(_grip_bone).origin
+	var support := base * _skeleton.get_bone_global_pose(_support_bone).origin
+	var forward := support - grip
+	if forward.length() < 0.05 or absf(forward.normalized().dot(Vector3.UP)) > 0.95:
+		forward = -global_transform.basis.z
+	# 손을 잇는 선만 쓰면 총이 몸을 가로지르는 동작이 있어, 바라보는 방향과 반씩 섞는다.
+	forward = (forward.normalized() - global_transform.basis.z).normalized()
+	var side := forward.cross(Vector3.UP).normalized()
+	var up := side.cross(forward)
+	_rifle.global_transform = Transform3D(
+		Basis(side, up, -forward), grip + forward * GRIP_OFFSET.x + up * GRIP_OFFSET.y
+	)

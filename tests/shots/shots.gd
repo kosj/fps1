@@ -48,10 +48,9 @@ func _add_avatar(at: Vector3, yaw: float, low: bool, color: Color, speed: float)
 	avatar.set_color(color)
 	avatar.set_pose(low, true)
 	if speed > 0.0:
-		# 제자리 걷기: 걸음 모양만 보려고 속도를 직접 넣는다.
+		# 제자리 달리기: 동작만 보려고 달리기 클립을 직접 재생한다.
 		avatar.set_process(false)
-		var pose: RefCounted = avatar.get("_pose")
-		get_tree().process_frame.connect(func() -> void: pose.call("update", 0.016, speed, false))
+		(avatar.get("_animation") as AnimationPlayer).play("run_f")
 
 
 func _process(_delta: float) -> void:
