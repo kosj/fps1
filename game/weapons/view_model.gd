@@ -19,8 +19,8 @@ const ELBOW_RIGHT := Vector3(0.14, -0.3, 0.5)
 const ELBOW_LEFT := Vector3(-0.3, -0.15, 0.2)
 ## 손목 축을 기준으로 손을 돌리는 각도(도). 오른손은 손잡이를 쥐게 세우고, 왼손은 손바닥이 위로.
 const ARM_TINT := Color(0.5, 0.52, 0.44)
-const ROLL_RIGHT := -80.0
-const ROLL_LEFT := 165.0
+const ROLL_RIGHT := 90.0
+const ROLL_LEFT := 180.0
 
 var aim_blend := 0.0
 var sprint_target := 0.0

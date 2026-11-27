@@ -22,7 +22,7 @@ extends Resource
 @export var aim_distance := 0.2
 ## 1인칭 손 위치(총 원점 기준, m). 오른손은 손잡이, 왼손은 총열 덮개 아래를 받친다.
 @export var grip_point := Vector3(0.0, -0.1, 0.07)
-@export var support_point := Vector3(0.0, -0.07, -0.28)
+@export var support_point := Vector3(0.0, -0.085, -0.28)
 ## 조준경이 화면을 가리는 총은 정조준 중에 모델을 숨긴다.
 @export var hide_when_aimed := false
 
