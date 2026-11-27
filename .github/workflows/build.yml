@@ -125,6 +125,16 @@ jobs:
           grep -q "NETTEST client:shooter ok" container.log
           ! grep -q "SCRIPT ERROR" container.log
 
+      # 실제 인터넷의 공용 서버에 접속해 본다. PR 제목이나 커밋 메시지에 server-check가 있을 때만 돈다.
+      # 서버가 쉬고 있으면 깨어나는 데 1분쯤 걸리므로 넉넉히 기다리고, 실패해도 빌드는 막지 않는다.
+      - name: Connect to the public server
+        if: contains(github.event.pull_request.title, 'server-check') || contains(github.event.head_commit.message, 'server-check')
+        continue-on-error: true
+        run: |
+          timeout 200 ~/godot/godot --headless -- --connect=wss://fps1-server.onrender.com --bot=shooter \
+            --exit-after=110 2>&1 | tee public.log
+          grep -E "NETSTATS|NETTEST|network:" public.log
+
       - name: Export Windows
         run: |
           mkdir -p build/windows

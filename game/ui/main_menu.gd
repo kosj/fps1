@@ -6,7 +6,9 @@ signal start_requested(kind: String, options: Dictionary)
 
 const MenuKit := preload("res://game/ui/menu_kit.gd")
 const Settings := preload("res://game/core/settings.gd")
-const DEFAULT_ADDRESS := "127.0.0.1:7777"
+## 공용 서버(Render 무료 요금제). 예전 기본값(내 PC)이 저장돼 있으면 이 주소로 바꿔 보여 준다.
+const DEFAULT_ADDRESS := "wss://fps1-server.onrender.com"
+const OLD_DEFAULT_ADDRESS := "127.0.0.1:7777"
 const DIFFICULTIES := ["easy", "normal", "hard"]
 const BACKDROP_MAP := "res://maps/depot/depot.tscn"
 const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
@@ -14,6 +16,9 @@ const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const ORBIT_RADIUS := 17.0
 const ORBIT_HEIGHT := 5.5
 const ORBIT_PERIOD := 90.0
+
+## 시작 화면에 한 번 보여 줄 알림(접속 실패 이유 등). 화면을 다시 불러와도 남도록 static이다.
+static var notice := ""
 
 var play_button: Button
 var range_button: Button
@@ -33,6 +38,11 @@ func _ready() -> void:
 	_build_backdrop()
 	var column := MenuKit.centered_column(self, Color(0.04, 0.05, 0.07, 0.68))
 	column.add_child(MenuKit.label("FPS1", 48))
+	if notice != "":
+		var notice_label := MenuKit.label(notice, 20)
+		notice_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.45))
+		column.add_child(notice_label)
+		notice = ""
 	column.add_child(_spacer(6.0))
 
 	play_button = MenuKit.button("PLAY VS BOTS")
@@ -78,12 +88,13 @@ func _ready() -> void:
 	column.add_child(_spacer(4.0))
 
 	address_edit = LineEdit.new()
-	address_edit.text = str(Settings.read(Settings.SERVER_ADDRESS, DEFAULT_ADDRESS))
+	var saved := str(Settings.read(Settings.SERVER_ADDRESS, DEFAULT_ADDRESS))
+	address_edit.text = DEFAULT_ADDRESS if saved == OLD_DEFAULT_ADDRESS else saved
 	address_edit.placeholder_text = "host:port or wss://address"
 	address_edit.custom_minimum_size = Vector2(320.0, 38.0)
 	address_edit.add_theme_font_size_override("font_size", 18)
 	column.add_child(address_edit)
-	join_button = MenuKit.button("JOIN SERVER")
+	join_button = MenuKit.button("PLAY ONLINE")
 	join_button.pressed.connect(_on_join)
 	column.add_child(join_button)
 	column.add_child(_spacer(4.0))
