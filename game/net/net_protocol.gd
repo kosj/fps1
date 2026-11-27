@@ -19,3 +19,6 @@ const FLAG_LOW := 1
 const FLAG_ALIVE := 2
 ## 지난 스냅샷 이후 발사했음. 다른 플레이어의 총소리를 내는 데 쓴다.
 const FLAG_FIRED := 4
+## 들고 있는 무기 칸(0~3)은 플래그의 4~5번 비트에 싣는다.
+const SLOT_SHIFT := 4
+const SLOT_MASK := 3
