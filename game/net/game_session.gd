@@ -13,6 +13,7 @@ extends Node
 ##   --mode=tdm|dom              경기 방식: 팀 데스매치(기본) 또는 점령전
 ##   --difficulty=easy|normal|hard 봇 난이도
 ##   --bots=5                    봇 수(로컬 대전 기본 5, 서버 기본 0)
+##   --seed=<n>                  봇의 난수 씨앗을 바꾼다(균형 측정용)
 ##   --spectate                  로컬 대전을 사람 없이 봇끼리만 진행(자동 테스트)
 ##   --server --port=7777        서버로 실행
 ##   --connect=127.0.0.1:7777    서버에 접속 (wss://host/path 형식도 가능, 웹은 주소창에 ?connect=...)
@@ -422,9 +423,11 @@ func _add_bots(count: int) -> void:
 	for index in count:
 		var id := 1000 + index
 		var entry := _add_participant(id, "bot")
-		var bot := CombatBot.new(id * 7919, entry["player"].rotation.y)
-		# 봇은 소총, 기관단총, 산탄총을 번갈아 든다. 저격총은 봇의 조준 방식과 맞지 않아 뺀다.
-		bot.weapon_slot = index % 3
+		var bot_seed := (id + int(_args.get("seed", "0"))) * 7919
+		var bot := CombatBot.new(bot_seed, entry["player"].rotation.y)
+		# 봇은 소총, 기관단총, 산탄총을 든다(저격총은 봇의 조준 방식과 맞지 않아 뺀다).
+		# 팀이 번갈아 배정되므로 둘씩 같은 무기를 줘서 양 팀의 무기 구성을 맞춘다.
+		bot.weapon_slot = (index >> 1) % 3
 		bot.navigator = _navigator
 		bot.set_difficulty(_difficulty)
 		entry["bot"] = bot
