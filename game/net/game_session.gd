@@ -34,6 +34,7 @@ const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const Effects := preload("res://game/fx/effects.gd")
 const Authority := preload("res://game/net/authority.gd")
 const Connector := preload("res://game/net/connector.gd")
+const LaunchArgs := preload("res://game/core/launch_args.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -132,7 +133,7 @@ func _ready() -> void:
 	var rescale := Settings.apply_ui_scale.bind(window)
 	if not window.size_changed.is_connected(rescale):
 		window.size_changed.connect(rescale)
-	_parse_args()
+	_args = LaunchArgs.parse()
 	if _left_game:
 		# 링크(?connect=)로 들어왔다가 나온 뒤에는 다시 자동 접속하지 않고 시작 화면을 보여 준다.
 		_args.erase("connect")
@@ -258,30 +259,6 @@ func _apply_quality() -> void:
 	Settings.apply_quality(_map, get_viewport())
 
 
-## 터치 조작의 조준 보조에 쓸, 지금 보이는 적들의 가슴 위치.
-func _update_assist_targets() -> void:
-	var targets: Array = []
-	var eye: Vector3 = _local.eye_position()
-	var candidates: Array = []
-	if mode == Mode.CLIENT:
-		for id: int in _avatars:
-			var avatar: RemoteAvatar = _avatars[id]
-			if avatar.alive and int(avatar.get_meta("team", -1)) != _view.own_team:
-				candidates.append([avatar.position, avatar.low])
-	else:
-		for id: int in _peers:
-			var other = _peers[id]["player"]
-			if int(_peers[id]["team"]) != _view.own_team and other.alive:
-				candidates.append([other.global_position, other.is_low()])
-	for candidate: Array in candidates:
-		var chest: Vector3 = candidate[0] + Vector3.UP * (0.7 if candidate[1] else 1.1)
-		var offset := chest - eye
-		var wall: Dictionary = _local.weapon.world_ray(eye, offset.normalized(), 1)
-		if wall.is_empty() or eye.distance_to(wall["position"]) >= offset.length():
-			targets.append(chest)
-	_local.assist_targets = targets
-
-
 func _resume() -> void:
 	if _local != null and _local.touch != null:
 		_local.set_paused(false)
@@ -343,7 +320,9 @@ func _physics_process(delta: float) -> void:
 			if _local != null:
 				_local.simulate(_next_local_cmd(delta), delta)
 	if _local != null and _local.touch != null:
-		_update_assist_targets()
+		_local.assist_targets = Authority.assist_targets(
+			_local, _avatars if mode == Mode.CLIENT else _peers, mode == Mode.CLIENT, _view.own_team
+		)
 	if _exit_after > 0.0 and _elapsed >= _exit_after:
 		_finish()
 
@@ -365,21 +344,6 @@ func _process(delta: float) -> void:
 
 
 # ---------------------------------------------------------------- 공통
-
-
-func _parse_args() -> void:
-	for argument in OS.get_cmdline_user_args():
-		if not argument.begins_with("--"):
-			continue
-		var parts := argument.substr(2).split("=", true, 1)
-		_args[parts[0]] = parts[1] if parts.size() > 1 else ""
-	# 웹 빌드에는 명령줄이 없으므로 주소창의 ?connect=호스트:포트 를 읽는다.
-	if OS.has_feature("web"):
-		var query := str(JavaScriptBridge.eval("window.location.search", true))
-		for pair in query.trim_prefix("?").split("&", false):
-			var parts := pair.split("=", true, 1)
-			if parts.size() == 2 and parts[0] in ["connect", "map"]:
-				_args[parts[0]] = parts[1].uri_decode()
 
 
 func _spawn_player(local: bool, spawn_index: int):
@@ -688,19 +652,7 @@ func _respawn(id: int, entry: Dictionary) -> void:
 
 
 func _send_snapshots() -> void:
-	var rows: Array = []
-	for id: int in _peers:
-		var player = _peers[id]["player"]
-		var flags := 0
-		if player.is_low():
-			flags |= Protocol.FLAG_LOW
-		if player.alive:
-			flags |= Protocol.FLAG_ALIVE
-		if _peers[id]["fired"]:
-			flags |= Protocol.FLAG_FIRED
-			_peers[id]["fired"] = false
-		flags |= (int(player.weapon.slot) & Protocol.SLOT_MASK) << Protocol.SLOT_SHIFT
-		rows.append([id, player.global_position, player.rotation.y, flags, _peers[id]["team"]])
+	var rows := Authority.snapshot_rows(_peers)
 	for id: int in _peers:
 		var entry: Dictionary = _peers[id]
 		if str(entry["kind"]) != "peer":
