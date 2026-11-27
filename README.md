@@ -3,7 +3,7 @@
 Windows와 웹에서 서비스하는 6v6 멀티플레이 1인칭 슈터입니다. Godot 4.7로 개발합니다.
 
 시작 화면에서 **봇 대전**(팀 데스매치 또는 점령전), 사격 연습장, 서버 접속 중 하나를 고릅니다.
-팀 데스매치는 30킬, 점령전은 거점 A·B·C를 차지해 150점을 먼저 얻는 쪽이 이기고 둘 다 5분 제한입니다. Esc를 누르면 일시 정지 화면에서 감도를 바꾸거나 시작 화면으로 돌아갈 수 있습니다. 서버를 띄우면 여러 명이 접속해 대전할 수 있습니다. 모델과 소리는 임시이고 메뉴 화면은 아직 없습니다.
+팀 데스매치는 30킬, 점령전은 거점 A·B·C를 차지해 150점을 먼저 얻는 쪽이 이기고 둘 다 5분 제한입니다. Esc를 누르면 일시 정지 화면에서 감도를 바꾸거나 시작 화면으로 돌아갈 수 있습니다. 서버를 띄우면 여러 명이 접속해 대전할 수 있습니다. 캐릭터는 Varco 3D, 총기·엄폐물은 Blender 스크립트, 맵 재질은 Poly Haven CC0, 효과음은 ElevenLabs로 만들었습니다(아래 "에셋" 참고).
 
 웹에서 바로 해 보기: https://kosj.github.io/fps1/ (화면을 클릭하면 마우스가 잠기고 조작이 시작됩니다)
 
@@ -78,6 +78,76 @@ GODOT=godot tests/net/run_net_test.sh prediction
 - 단위 테스트: 이동, 무기, 판정, 입력 검증 같은 순수 계산
 - 통합 테스트(smoke): 실제 플레이어 씬으로 걷기, 사격, 재장전, 슬라이딩, 난간 넘기
 - 봇 대전 테스트: `godot --headless --fixed-fps 60 -- --spectate --bots=6 --exit-after=60 --expect-kills=3`
+  - 균형 측정: `--seed=<n>`으로 봇 난수를 바꿔 여러 판의 `match over: a - b` 출력을 집계
+- 네트워크 테스트: 서버와 봇 클라이언트를 실제 프로세스로 띄워 지연을 넣고 확인
+  - `lagcomp`: 양방향 50ms 지연에서 좌우로 움직이는 상대를 맞히는지
+  - `nolagcomp`: 지연 보상을 끄면 같은 조건에서 거의 못 맞히는지(테스트 자체의 검증)
+  - `prediction`: 80ms 지연에서 달리기, 슬라이딩, 점프의 예측이 서버 결과와 일치하는지
+
+## 빌드
+
+`main` 브랜치에 푸시하거나 PR을 열면 GitHub Actions가 린트, 단위 테스트, 내보내기를 수행합니다.
+결과물은 Actions 실행 페이지의 Artifacts에서 받습니다.
+
+| 프리셋 | 렌더러 | 산출물 |
+| --- | --- | --- |
+| Windows Desktop | Forward+ | `fps1-windows` |
+| Web | Compatibility (WebGL 2) | `fps1-web` |
+| Linux Server | 헤드리스 | `fps1-linux-server` |
+
+웹 빌드는 HTTPS 또는 localhost에서 열어야 합니다.
+
+### 웹 배포
+
+`main`에 병합될 때마다 웹 빌드가 `gh-pages` 브랜치에 올라갑니다.
+저장소 Settings → Pages에서 Source를 "Deploy from a branch", 브랜치를 `gh-pages`로 지정하면 GitHub Pages 주소로 서비스됩니다.
+게임 서버가 아직 배포되지 않았으므로 웹에서는 봇 대전만 됩니다. 대전을 하려면 `?connect=wss://서버주소`가 가리킬 TLS 게임 서버가 필요합니다.
+
+## 폴더 구조
+
+```
+game/                 core, movement, player, weapons, combat, match, bots, net, ui, audio, fx, world
+game/weapons/models/  총기와 1인칭 팔 GLB
+game/player/models/   병사 GLB (동작 8종 포함)
+game/audio/sfx/       효과음 OGG
+maps/                 맵 씬, maps/textures(재질), maps/props(엄폐물 GLB)
+tests/                단위 테스트, smoke, 네트워크 테스트, shots(화면 캡처)
+tools/asset_pipeline/ 에셋 제작 스크립트 (Blender)
+docs/                 기술 결정 기록, 에셋 품질 기준
+```
+
+## 에셋
+
+| 에셋 | 만든 방법 | 다시 만들기 |
+|---|---|---|
+| 총기 4종 | Blender 스크립트 모델링 + 마모 텍스처 베이크 | `blender -b --python tools/asset_pipeline/build_weapons.py -- game/weapons/models` |
+| 엄폐물 | Blender 스크립트 모델링(맵에서 쓰는 크기별) | `blender -b --python tools/asset_pipeline/build_props.py -- maps/props` |
+| 병사 | Varco 3D: 이미지 → 3D → 리깅 → 소총 동작 8종 | `merge_character.py`로 동작별 GLB를 하나로 합침 |
+| 1인칭 팔 | Varco 손가락 리깅에서 손가락을 굽혀 잘라냄 | `extract_arms.py` |
+| 맵 재질 | Poly Haven CC0 (1K) | `maps/textures/README.md` |
+| 효과음 | ElevenLabs 효과음 생성 후 잘라서 음량 맞춤 | `game/audio/sfx/README.md` |
+
+AI로 만든 메시를 넣기 전에는 `tools/asset_pipeline/analyze.py`로 삼각형 수·UV·파일 크기를 재고,
+기준은 `docs/asset_quality.md`를 따릅니다. 각진 물체는 AI 메시 대신 스크립트로 모델링합니다.
+
+화면 확인: 창이 없는 환경에서도 `xvfb-run godot --rendering-driver opengl3 res://tests/shots/shots.tscn -- --out=build/shots`
+로 무기별 지향/정조준 화면을 PNG로 저장할 수 있습니다.
+
+## 테스트
+
+```
+godot --headless --import
+godot --headless --script res://tests/run_tests.gd
+godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn
+GODOT=godot tests/net/run_net_test.sh lagcomp
+GODOT=godot tests/net/run_net_test.sh nolagcomp
+GODOT=godot tests/net/run_net_test.sh prediction
+```
+
+- 단위 테스트: 이동, 무기, 판정, 입력 검증 같은 순수 계산
+- 통합 테스트(smoke): 실제 플레이어 씬으로 걷기, 사격, 재장전, 슬라이딩, 난간 넘기
+- 봇 대전 테스트: `godot --headless --fixed-fps 60 -- --spectate --bots=6 --exit-after=60 --expect-kills=3`
+  - 균형 측정: `--seed=<n>`으로 봇 난수를 바꿔 여러 판의 `match over: a - b` 출력을 집계
 - 네트워크 테스트: 서버와 봇 클라이언트를 실제 프로세스로 띄워 지연을 넣고 확인
   - `lagcomp`: 양방향 50ms 지연에서 좌우로 움직이는 상대를 맞히는지
   - `nolagcomp`: 지연 보상을 끄면 같은 조건에서 거의 못 맞히는지(테스트 자체의 검증)
