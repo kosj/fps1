@@ -1,11 +1,13 @@
-[gd_resource type="Resource" load_steps=3 format=3]
+[gd_resource type="Resource" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://game/weapons/weapon_data.gd" id="1_data"]
 [ext_resource type="PackedScene" path="res://game/weapons/models/smg_kestrel.glb" id="2_model"]
+[ext_resource type="AudioStream" path="res://game/audio/sfx/shot_smg.ogg" id="3_shot"]
 
 [resource]
 script = ExtResource("1_data")
 model = ExtResource("2_model")
+shot_sound = ExtResource("3_shot")
 sight_height = 0.08
 hide_when_aimed = false
 display_name = "Kestrel-9"
