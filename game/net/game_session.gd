@@ -270,10 +270,10 @@ func _on_touch_toggled(enabled: bool) -> void:
 	if _local == null:
 		return
 	if enabled:
-		_local.enable_touch()
+		_local.set_touch(true)
 		_local.set_paused(true)
 	else:
-		_local.disable_touch()
+		_local.set_touch(false)
 
 
 ## 계속하기를 눌렀는데도 포인터 잠금이 되지 않고 터치 화면이 있으면, 휴대폰으로 보고 터치 조작을 켠다.
@@ -286,7 +286,7 @@ func _check_capture_fallback(delta: float) -> void:
 		return
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	if not captured and DisplayServer.is_touchscreen_available():
-		_local.enable_touch()
+		_local.set_touch(true)
 		_local.set_paused(false)
 
 
