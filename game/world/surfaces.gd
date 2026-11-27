@@ -41,6 +41,8 @@ static func material(kind: String) -> StandardMaterial3D:
 		return result
 	var color_prefix: String = TEXTURE_DIR + str(spec[3]) if spec.size() > 3 else prefix
 	result.albedo_texture = load(color_prefix + "_diff.jpg")
+	# 비스듬히 보이는 바닥과 벽이 뭉개지지 않게 이방성 필터를 쓴다.
+	result.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	result.uv1_triplanar = true
 	result.uv1_world_triplanar = true
 	result.uv1_scale = Vector3.ONE * float(spec[1])
