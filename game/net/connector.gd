@@ -8,11 +8,15 @@ signal failed(reason: String)
 
 const RETRY_DELAY := 3.0
 const MAX_WAIT := 150.0
+## 접속은 됐는데 이 시간 동안 스냅샷이 하나도 오지 않으면 서버와 게임의 버전이 다른 것으로 본다.
+## (새 버전을 올린 직후 몇 분간 서버와 웹 빌드가 엇갈린다.)
+const SILENT_LIMIT := 8.0
 
 var _url := ""
 var _waiting := 0.0
 var _retry_in := -1.0
 var _online := false
+var _silent := 0.0
 var _label: Label
 
 
@@ -52,6 +56,7 @@ func start(address: String) -> void:
 
 func _process(delta: float) -> void:
 	if _online:
+		_watch_for_silence(delta)
 		return
 	_waiting += delta
 	var text := "Connecting to the server..."
@@ -62,6 +67,19 @@ func _process(delta: float) -> void:
 		_retry_in -= delta
 		if _retry_in < 0.0:
 			_attempt()
+
+
+func _watch_for_silence(delta: float) -> void:
+	if _silent < 0.0:
+		return
+	var session_stats: Variant = get_parent().get("stats")
+	if session_stats is Dictionary and int(session_stats.get("snapshots", 0)) > 0:
+		_silent = -1.0
+		return
+	_silent += delta
+	if _silent > SILENT_LIMIT:
+		_silent = -1.0
+		failed.emit("The server is updating. Reload and try again in a few minutes.")
 
 
 func _attempt() -> void:
