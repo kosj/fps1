@@ -20,3 +20,4 @@ game/weapons/models/*.glb -filter -diff -merge -text
 maps/textures/*.jpg -filter -diff -merge -text
 maps/props/*.glb -filter -diff -merge -text
 game/player/models/*.glb -filter -diff -merge -text
+game/player/models/*.jpg -filter -diff -merge -text
