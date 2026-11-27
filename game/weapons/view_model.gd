@@ -1,16 +1,18 @@
 extends Node3D
-## 1인칭 무기 모델(임시 상자 모델)과 프로시저럴 애니메이션.
+## 1인칭 무기 모델과 프로시저럴 애니메이션.
 ## 흔들림, 보행 흔들림, 반동, 정조준 전환, 달리기 자세, 재장전 동작을 스프링과 보간으로 만든다.
-## M3에서 Varco 3D와 Blender로 만든 모델로 교체한다.
+## 모델은 tools/asset_pipeline/build_weapons.py로 만든 GLB이고, 없으면 임시 상자 모델을 쓴다.
 
 const Spring := preload("res://game/core/spring.gd")
-const HIP_POSITION := Vector3(0.2, -0.19, -0.42)
-const ADS_POSITION := Vector3(0.0, -0.085, -0.3)
+const HIP_POSITION := Vector3(0.17, -0.17, -0.3)
+const ADS_POSITION := Vector3(0.0, -0.085, -0.2)
 const SPRINT_ROTATION := Vector3(-0.2, 0.55, 0.1)
 const RELOAD_DROP := Vector3(0.02, -0.16, 0.04)
 const RELOAD_TILT := Vector3(0.5, 0.0, -0.35)
 const MUZZLE_POSITION := Vector3(0.0, 0.0, -0.72)
 const FLASH_TIME := 0.045
+const MAG_DROP := Vector3(0.0, -0.22, 0.03)
+const ACTION_TRAVEL := 0.035
 
 var aim_blend := 0.0
 var sprint_target := 0.0
@@ -26,11 +28,49 @@ var _reload_total := 1.0
 var _flash_left := 0.0
 var _muzzle_light: OmniLight3D
 var _muzzle_mesh: MeshInstance3D
+var _model: Node3D
+var _placeholder: Node3D
+var _mag: Node3D
+var _action: Node3D
+var _mag_rest := Vector3.ZERO
+var _action_rest := Vector3.ZERO
+var _action_kick := 0.0
+var _ads_position := ADS_POSITION
+var _hide_when_aimed := false
 
 
 func _ready() -> void:
 	position = HIP_POSITION
-	_build_placeholder_rifle()
+	_build_muzzle_flash()
+	if _model == null:
+		_build_placeholder_rifle()
+
+
+## 무기 데이터에 맞는 모델로 바꾼다. 모델이 없는 데이터면 임시 상자 모델을 유지한다.
+func set_weapon(data: Resource) -> void:
+	var scene := data.get("model") as PackedScene
+	if scene == null:
+		return
+	if _model != null:
+		_model.queue_free()
+	if _placeholder != null:
+		_placeholder.queue_free()
+		_placeholder = null
+	_model = scene.instantiate() as Node3D
+	add_child(_model)
+	for mesh in _model.find_children("*", "MeshInstance3D", true, false):
+		(mesh as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_mag = _model.find_child("mag", true, false) as Node3D
+	_action = _model.find_child("action", true, false) as Node3D
+	_mag_rest = _mag.position if _mag != null else Vector3.ZERO
+	_action_rest = _action.position if _action != null else Vector3.ZERO
+	var muzzle := _model.find_child("muzzle", true, false) as Node3D
+	var muzzle_at := muzzle.position if muzzle != null else MUZZLE_POSITION
+	if _muzzle_mesh != null:
+		_muzzle_mesh.position = muzzle_at
+		_muzzle_light.position = muzzle_at
+	_ads_position = Vector3(0.0, -float(data.get("sight_height")), -float(data.get("aim_distance")))
+	_hide_when_aimed = bool(data.get("hide_when_aimed"))
 
 
 ## 마우스 이동량(픽셀)을 받아 총이 시선을 살짝 늦게 따라오게 한다.
@@ -46,6 +86,7 @@ func kick(kick_deg: Vector2) -> void:
 	var yaw := deg_to_rad(-kick_deg.x) * 20.0
 	_rotation_spring.add_impulse(Vector3(pitch, yaw, 0.0) * factor)
 	_flash_left = FLASH_TIME
+	_action_kick = 1.0
 
 
 func play_reload(duration: float) -> void:
@@ -67,13 +108,22 @@ func _process(delta: float) -> void:
 	if _reload_left <= 0.0:
 		reload_curve = 0.0
 
-	var base := HIP_POSITION.lerp(ADS_POSITION, smoothstep(0.0, 1.0, aim_blend))
+	var base := HIP_POSITION.lerp(_ads_position, smoothstep(0.0, 1.0, aim_blend))
 	var spring_offset := _position_spring.update(Vector3.ZERO, delta)
 	position = base + bob + RELOAD_DROP * reload_curve + spring_offset
 
 	var sprint_pose := SPRINT_ROTATION * _sprint_blend * hip_weight
 	var spring_rotation := _rotation_spring.update(Vector3.ZERO, delta)
 	rotation = sprint_pose + RELOAD_TILT * reload_curve + spring_rotation
+
+	# 부품 움직임: 재장전 중간에 탄창이 빠졌다 들어오고, 쏠 때 노리쇠(펌프)가 뒤로 밀린다.
+	_action_kick = move_toward(_action_kick, 0.0, delta * 9.0)
+	if _mag != null:
+		_mag.position = _mag_rest + MAG_DROP * reload_curve
+	if _action != null:
+		_action.position = _action_rest + Vector3(0.0, 0.0, ACTION_TRAVEL * _action_kick)
+	if _model != null:
+		_model.visible = not (_hide_when_aimed and aim_blend > 0.85)
 
 	_flash_left = maxf(_flash_left - delta, 0.0)
 	var flashing := _flash_left > 0.0
@@ -82,6 +132,8 @@ func _process(delta: float) -> void:
 
 
 func _build_placeholder_rifle() -> void:
+	_placeholder = Node3D.new()
+	add_child(_placeholder)
 	var metal := StandardMaterial3D.new()
 	metal.albedo_color = Color(0.13, 0.14, 0.16)
 	metal.metallic = 0.6
@@ -90,14 +142,16 @@ func _build_placeholder_rifle() -> void:
 	polymer.albedo_color = Color(0.22, 0.23, 0.2)
 	polymer.roughness = 0.8
 
-	_add_part(Vector3(0.0, 0.0, -0.15), Vector3(0.06, 0.09, 0.5), metal)
-	_add_part(Vector3(0.0, 0.01, -0.55), Vector3(0.025, 0.025, 0.3), metal)
-	_add_part(Vector3(0.0, -0.12, -0.12), Vector3(0.04, 0.16, 0.07), polymer)
-	_add_part(Vector3(0.0, -0.1, 0.06), Vector3(0.04, 0.12, 0.05), polymer)
-	_add_part(Vector3(0.0, -0.01, 0.22), Vector3(0.05, 0.1, 0.26), polymer)
-	_add_part(Vector3(0.0, 0.06, 0.04), Vector3(0.012, 0.03, 0.012), metal)
-	_add_part(Vector3(0.0, 0.06, -0.38), Vector3(0.008, 0.03, 0.008), metal)
+	_add_part(Vector3(0.0, 0.0, -0.15), Vector3(0.06, 0.09, 0.5), metal, _placeholder)
+	_add_part(Vector3(0.0, 0.01, -0.55), Vector3(0.025, 0.025, 0.3), metal, _placeholder)
+	_add_part(Vector3(0.0, -0.12, -0.12), Vector3(0.04, 0.16, 0.07), polymer, _placeholder)
+	_add_part(Vector3(0.0, -0.1, 0.06), Vector3(0.04, 0.12, 0.05), polymer, _placeholder)
+	_add_part(Vector3(0.0, -0.01, 0.22), Vector3(0.05, 0.1, 0.26), polymer, _placeholder)
+	_add_part(Vector3(0.0, 0.06, 0.04), Vector3(0.012, 0.03, 0.012), metal, _placeholder)
+	_add_part(Vector3(0.0, 0.06, -0.38), Vector3(0.008, 0.03, 0.008), metal, _placeholder)
 
+
+func _build_muzzle_flash() -> void:
 	var flash_material := StandardMaterial3D.new()
 	flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	flash_material.albedo_color = Color(1.0, 0.85, 0.45)
@@ -112,7 +166,9 @@ func _build_placeholder_rifle() -> void:
 	add_child(_muzzle_light)
 
 
-func _add_part(center: Vector3, size: Vector3, material: Material) -> MeshInstance3D:
+func _add_part(
+	center: Vector3, size: Vector3, material: Material, parent: Node = self
+) -> MeshInstance3D:
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	mesh.material = material
@@ -120,5 +176,5 @@ func _add_part(center: Vector3, size: Vector3, material: Material) -> MeshInstan
 	part.mesh = mesh
 	part.position = center
 	part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(part)
+	parent.add_child(part)
 	return part

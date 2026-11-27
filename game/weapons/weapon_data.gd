@@ -9,6 +9,16 @@ extends Resource
 ## 산탄이 조준점 주위로 퍼지는 각도. 정조준해도 줄지 않는다.
 @export var pellet_spread_deg := 0.0
 
+@export_group("Model")
+## 1인칭 모델(GLB). body / mag / action 부품과 muzzle 위치를 담고 있다. 비우면 임시 상자 모델.
+@export var model: PackedScene
+## 정조준할 때 화면 중앙에 올 조준선 높이(총열 축 기준, m).
+@export var sight_height := 0.085
+## 정조준할 때 눈에서 총 원점까지의 거리(m). 개머리판이 긴 총은 줄여서 눈을 뒤쪽에 둔다.
+@export var aim_distance := 0.2
+## 조준경이 화면을 가리는 총은 정조준 중에 모델을 숨긴다.
+@export var hide_when_aimed := false
+
 @export_group("Damage")
 @export var damage := 28.0
 @export var min_damage := 18.0

@@ -11,6 +11,8 @@ const KILL_COLOR := Color(1.0, 0.25, 0.2)
 var spread_deg := 2.0
 var aim_blend := 0.0
 var fov := 80.0
+## 조준경을 쓰는 총을 정조준했을 때 1에 가까워진다. 조준경 화면(검은 테두리와 십자선)을 그린다.
+var scope_blend := 0.0
 
 ## 피격 방향 표시. 각 항목은 [화면 기준 각도(라디안, 0이 정면, 시계 방향), 불투명도].
 var damage_marks: Array = []
@@ -44,6 +46,8 @@ func _draw() -> void:
 			var start := center + direction * gap
 			draw_line(start, start + direction * LINE_LENGTH, color, LINE_WIDTH)
 		draw_circle(center, 1.5, color)
+	if scope_blend > 0.01:
+		_draw_scope(center)
 	for mark: Array in damage_marks:
 		var middle := float(mark[0]) - PI / 2.0
 		var mark_color := Color(1.0, 0.15, 0.1, 0.85 * float(mark[1]))
@@ -54,3 +58,17 @@ func _draw() -> void:
 		for direction: Vector2 in [Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]:
 			var unit := direction.normalized()
 			draw_line(center + unit * 7.0, center + unit * 15.0, color, LINE_WIDTH)
+
+
+func _draw_scope(center: Vector2) -> void:
+	var radius := size.y * 0.46
+	var black := Color(0.0, 0.0, 0.0, scope_blend)
+	# 원 바깥을 두꺼운 고리로 덮는다. 고리 두께를 화면 대각선보다 크게 잡아 모서리까지 가린다.
+	var reach := size.length()
+	draw_arc(center, radius + reach / 2.0, 0.0, TAU, 96, black, reach, true)
+	draw_arc(center, radius, 0.0, TAU, 96, Color(0.0, 0.0, 0.0, scope_blend), 6.0, true)
+	var line := Color(0.0, 0.0, 0.0, 0.9 * scope_blend)
+	draw_line(center - Vector2(radius, 0.0), center + Vector2(radius, 0.0), line, 1.5)
+	draw_line(center - Vector2(0.0, radius), center + Vector2(0.0, radius), line, 1.5)
+	for direction: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.DOWN]:
+		draw_line(center + direction * radius * 0.35, center + direction * radius, line, 5.0)
