@@ -51,6 +51,13 @@ var _path: Array = []
 var _path_goal := Vector3.INF
 
 
+## 맵이 바뀌었을 때 새 이동 그래프로 갈아 끼우고, 옛 맵의 경로와 목적지를 버린다.
+func use_navigator(graph: RefCounted) -> void:
+	navigator = graph
+	_path.clear()
+	_stuck_time = 0.0
+
+
 func _init(p_seed: int = 1, start_yaw: float = 0.0) -> void:
 	_rng.seed = p_seed
 	_yaw = start_yaw

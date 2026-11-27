@@ -30,6 +30,13 @@ static func name_of(id: int, own_id: int) -> String:
 
 ## 거점 표시와 HUD를 갱신한다. zones는 맵의 거점 목록([이름, 중심]),
 ## states의 각 항목은 [소유 팀, 진행도, 점령 중인 팀]. hud는 없을 수 있다.
+## 맵이 바뀌면 거점 표시를 지운다. 다음 show_zones가 새 맵의 거점으로 다시 만든다.
+func clear_zones() -> void:
+	for marker: Node in _markers:
+		marker.queue_free()
+	_markers.clear()
+
+
 func show_zones(parent: Node, hud, zones: Array, states: Array) -> void:
 	if states.is_empty():
 		return

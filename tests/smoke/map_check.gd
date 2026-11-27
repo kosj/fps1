@@ -4,9 +4,10 @@ extends Node3D
 ## - 이동 그래프의 모든 연결이 사람 폭만큼 비어 있는지
 ## - 양 팀 진영이 그래프로 이어져 있는지, 팀 스폰이 자기 진영에 있는지
 ## - 스폰에서 상대 스폰이 바로 보이지 않는지
-## 실행: godot --headless --fixed-fps 60 res://tests/smoke/map_check.tscn
+## 실행: godot --headless --fixed-fps 60 res://tests/smoke/map_check.tscn [-- --map=compound]
 
-const MAP_SCENE := preload("res://maps/depot/depot.tscn")
+const Catalog := preload("res://maps/catalog.gd")
+const LaunchArgs := preload("res://game/core/launch_args.gd")
 const NavGraph := preload("res://game/bots/nav_graph.gd")
 const BODY_HALF_WIDTH := 0.45
 const CHECK_HEIGHTS := [0.3, 1.2]
@@ -17,7 +18,8 @@ var _failures := PackedStringArray()
 
 
 func _ready() -> void:
-	_map = MAP_SCENE.instantiate()
+	var map_name := str(LaunchArgs.parse().get("map", "depot"))
+	_map = (load(Catalog.path(map_name)) as PackedScene).instantiate()
 	add_child(_map)
 
 

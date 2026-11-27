@@ -1,0 +1,69 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://maps/compound/compound.gd" id="1_map"]
+
+[sub_resource type="ProceduralSkyMaterial" id="sky_material"]
+sky_top_color = Color(0.2, 0.3, 0.55, 1)
+sky_horizon_color = Color(0.98, 0.68, 0.42, 1)
+ground_bottom_color = Color(0.18, 0.17, 0.16, 1)
+ground_horizon_color = Color(0.85, 0.6, 0.4, 1)
+sun_angle_max = 12.0
+
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("sky_material")
+
+[sub_resource type="Environment" id="environment"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 3
+ambient_light_sky_contribution = 0.9
+ambient_light_energy = 1.8
+tonemap_mode = 3
+tonemap_exposure = 1.05
+tonemap_white = 6.0
+ssao_enabled = true
+ssao_radius = 1.2
+ssao_intensity = 2.2
+glow_enabled = true
+glow_intensity = 0.35
+glow_bloom = 0.05
+fog_enabled = true
+fog_light_color = Color(0.9, 0.68, 0.5, 1)
+fog_density = 0.006
+fog_sky_affect = 0.2
+adjustment_enabled = true
+adjustment_contrast = 1.08
+adjustment_saturation = 1.05
+
+[sub_resource type="StandardMaterial3D" id="floor_material"]
+albedo_color = Color(0.27, 0.28, 0.3, 1)
+
+[sub_resource type="BoxMesh" id="floor_mesh"]
+material = SubResource("floor_material")
+size = Vector3(50, 1, 66)
+
+[sub_resource type="BoxShape3D" id="floor_shape"]
+size = Vector3(50, 1, 66)
+
+[node name="Compound" type="Node3D"]
+script = ExtResource("1_map")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("environment")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+light_color = Color(1, 0.78, 0.55, 1)
+light_energy = 1.9
+shadow_enabled = true
+shadow_bias = 0.04
+shadow_blur = 1.5
+directional_shadow_max_distance = 90.0
+
+[node name="Floor" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("floor_mesh")
+
+[node name="Collision" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("floor_shape")

@@ -35,6 +35,7 @@ const Effects := preload("res://game/fx/effects.gd")
 const Authority := preload("res://game/net/authority.gd")
 const Connector := preload("res://game/net/connector.gd")
 const LaunchArgs := preload("res://game/core/launch_args.gd")
+const Catalog := preload("res://maps/catalog.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -142,7 +143,7 @@ func _ready() -> void:
 	_delay_ticks = int(round(float(_args.get("net-delay-ms", "0")) * Protocol.TICK_RATE / 1000.0))
 	if _args.has("bot"):
 		_bot = ScriptBot.new(str(_args["bot"]))
-	_load_map(str(_args.get("map", RANGE_MAP if _args.has("range") else DEFAULT_MAP)))
+	_load_map(Catalog.path(str(_args.get("map", RANGE_MAP if _args.has("range") else DEFAULT_MAP))))
 
 	var direct := OS.has_feature("dedicated_server")
 	for key: String in DIRECT_START_ARGS:
@@ -165,6 +166,23 @@ func _load_map(path: String) -> void:
 	_navigator = null
 	if _map.has_method("nav_graph"):
 		_navigator = NavGraph.new(_map.call("nav_graph"))
+
+
+## 경기 중에 맵을 바꾼다(판 사이의 맵 순환, 서버가 알려 준 맵). 같은 맵이면 아무것도 하지 않는다.
+func _change_map(map_name: String) -> void:
+	if Catalog.path(map_name) == _map.scene_file_path:
+		return
+	_load_map(Catalog.path(map_name))
+	print("map: %s" % map_name)
+	_apply_quality()
+	_view.clear_zones()
+	if _domination != null:
+		var captures := _domination.captures
+		_domination = Domination.new(_map.call("capture_zones"))
+		_domination.captures = captures
+	for id: int in _peers:
+		if _peers[id]["bot"] != null:
+			_peers[id]["bot"].use_navigator(_navigator)
 
 
 func is_started() -> bool:
@@ -226,6 +244,7 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 			_local = _spawn_player(true, 0)
 		_:
 			mode = Mode.LOCAL_MATCH
+			_change_map(str(options.get("map", "depot")))
 			_difficulty = str(options.get("difficulty", Settings.difficulty()))
 			_set_game_mode(str(options.get("mode", "tdm")))
 			_local = _add_participant(LOCAL_ID, "local")["player"]
@@ -395,6 +414,7 @@ func _start_server(port: int) -> void:
 
 func _on_peer_connected(id: int) -> void:
 	_add_participant(id, "peer")
+	_rpc_map.rpc_id(id, Catalog.name_of(_map.scene_file_path))
 	_send_scores()
 	print("peer %d joined (%d players)" % [id, _peers.size()])
 
@@ -623,8 +643,13 @@ func _start_new_match() -> void:
 	_time_left = MATCH_TIME
 	if _domination != null:
 		_domination.reset()
+	# 판마다 다음 맵으로 넘어간다. 목록에 없는 맵(테스트용)은 그대로 둔다.
+	var following := Catalog.next(Catalog.name_of(_map.scene_file_path))
+	_change_map(following)
 	for id: int in _peers:
 		var entry: Dictionary = _peers[id]
+		if str(entry["kind"]) == "peer":
+			_rpc_map.rpc_id(id, following)
 		entry["kills"] = 0
 		entry["deaths"] = 0
 		_respawn(id, entry)
@@ -844,6 +869,11 @@ func _rpc_hit(headshot: bool, killed: bool, at: Vector3) -> void:
 func _rpc_damaged(from: Vector3) -> void:
 	if mode == Mode.CLIENT and _local != null:
 		_local.show_damage_from(from)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_map(map_name: String) -> void:
+	_change_map(map_name)
 
 
 @rpc("authority", "call_remote", "reliable")
