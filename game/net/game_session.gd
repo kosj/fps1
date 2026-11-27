@@ -478,6 +478,7 @@ func _on_participant_fired(_kick: Vector2, id: int) -> void:
 	entry["fired"] = true
 	entry["protected"] = 0.0
 	if entry["avatar"] != null:
+		entry["avatar"].set_weapon(entry["player"].weapon.slot)
 		entry["avatar"].play_shot()
 
 
@@ -678,6 +679,7 @@ func _send_snapshots() -> void:
 		if _peers[id]["fired"]:
 			flags |= Protocol.FLAG_FIRED
 			_peers[id]["fired"] = false
+		flags |= (int(player.weapon.slot) & Protocol.SLOT_MASK) << Protocol.SLOT_SHIFT
 		rows.append([id, player.global_position, player.rotation.y, flags, _peers[id]["team"]])
 	for id: int in _peers:
 		var entry: Dictionary = _peers[id]
@@ -916,6 +918,7 @@ func _apply_snapshot(
 		avatar.push(tick, row[1], row[2], is_low, is_alive)
 		avatar.set_color(_view.relative_color(int(row[4])))
 		avatar.set_meta("team", int(row[4]))
+		avatar.set_weapon((flags >> Protocol.SLOT_SHIFT) & Protocol.SLOT_MASK)
 		if (flags & Protocol.FLAG_FIRED) != 0:
 			avatar.play_shot()
 	for id: int in _avatars.keys():

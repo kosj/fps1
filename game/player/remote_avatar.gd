@@ -5,8 +5,13 @@ extends Node3D
 
 const HitMath := preload("res://game/combat/hit_math.gd")
 const SOLDIER := preload("res://game/player/models/soldier.glb")
-const RIFLE := preload("res://game/weapons/models/rifle_vk7.glb")
-const SHOT_SOUND := preload("res://game/audio/sfx/shot_rifle.ogg")
+## 무기 칸 순서. game/player/player.gd의 기본 무장과 같다.
+const WEAPONS := [
+	preload("res://game/weapons/data/rifle_vk7.tres"),
+	preload("res://game/weapons/data/smg_kestrel.tres"),
+	preload("res://game/weapons/data/shotgun_m90.tres"),
+	preload("res://game/weapons/data/sniper_lr12.tres"),
+]
 const MAX_SAMPLES := 40
 ## 모델 원본 키(약 1m)를 히트 판정 키에 맞추는 배율.
 const MODEL_HEIGHT := 1.0
@@ -35,6 +40,7 @@ var _last_position := Vector3.ZERO
 var _has_last := false
 var _skeleton: Skeleton3D
 var _rifle: Node3D
+var _weapon_slot := -1
 var _grip_bone := -1
 var _support_bone := -1
 var _shown_alive := true
@@ -96,18 +102,32 @@ func build() -> void:
 	if _skeleton != null:
 		_grip_bone = _skeleton.find_bone(GRIP_BONE)
 		_support_bone = _skeleton.find_bone(SUPPORT_BONE)
-	if _grip_bone >= 0 and _support_bone >= 0:
-		_rifle = RIFLE.instantiate() as Node3D
-		add_child(_rifle)
 	_play("idle", 1.0)
 	# 거리와 방향이 들리는 3D 총소리. 적의 위치를 귀로 알 수 있게 한다.
 	_shot_audio = AudioStreamPlayer3D.new()
-	_shot_audio.stream = SHOT_SOUND
 	_shot_audio.unit_size = 14.0
 	_shot_audio.max_distance = 110.0
 	_shot_audio.max_polyphony = 4
 	_shot_audio.position.y = 1.4
 	add_child(_shot_audio)
+	set_weapon(0)
+
+
+## 들고 있는 무기를 바꾼다. 모델과 발사음이 그 무기 것으로 바뀐다.
+func set_weapon(slot: int) -> void:
+	slot = clampi(slot, 0, WEAPONS.size() - 1)
+	if slot == _weapon_slot or _shot_audio == null:
+		return
+	_weapon_slot = slot
+	var data: Resource = WEAPONS[slot]
+	_shot_audio.stream = data.get("shot_sound")
+	if _grip_bone < 0 or _support_bone < 0:
+		return
+	if _rifle != null:
+		_rifle.queue_free()
+	_rifle = (data.get("model") as PackedScene).instantiate() as Node3D
+	_rifle.visible = alive
+	add_child(_rifle)
 
 
 func play_shot() -> void:
