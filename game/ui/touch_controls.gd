@@ -151,7 +151,7 @@ func _layout() -> Dictionary:
 		"jump": [Vector2(area.x - 75.0, area.y - 265.0), 44.0, "JUMP"],
 		"crouch": [Vector2(area.x - 225.0, area.y - 205.0), 42.0, "DUCK"],
 		"reload": [Vector2(area.x - 355.0, area.y - 65.0), 38.0, "R"],
-		"weapon": [Vector2(area.x - 75.0, area.y - 365.0), 38.0, "GUN"],
+		"weapon": [Vector2(area.x - 190.0, area.y - 300.0), 38.0, "GUN"],
 		"pause": [Vector2(60.0, 60.0), 34.0, "II"],
 	}
 

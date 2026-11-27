@@ -8,7 +8,7 @@ const RIGHT := Vector2(800.0, 300.0)
 const FIRE := Vector2(1160.0, 590.0)
 const JUMP := Vector2(1205.0, 455.0)
 const AIM := Vector2(1030.0, 645.0)
-const WEAPON := Vector2(1205.0, 355.0)
+const WEAPON := Vector2(1090.0, 420.0)
 const PAUSE := Vector2(60.0, 60.0)
 
 
