@@ -9,6 +9,10 @@ const Grenades := preload("res://game/combat/grenades.gd")
 const Armory := preload("res://game/weapons/armory.gd")
 ## 리스폰 뒤 이 시간(초) 안에, 아직 쏘지 않았으면 로드아웃을 바로 바꿀 수 있다.
 const SWAP_TIME := 6.0
+## 근접 공격: 닿는 거리(m), 시선에서 벗어나도 되는 각도(라디안), 피해(체력 100이라 한 번에 쓰러진다).
+const MELEE_RANGE := 2.3
+const MELEE_CONE := 0.7
+const MELEE_DAMAGE := 100.0
 const BOT_SIGHT_RANGE := 60.0
 const BOT_NEAR_RANGE := 10.0
 
@@ -152,7 +156,10 @@ static func blast_hits(peers: Dictionary, owner_id: int, at: Vector3) -> Array:
 static func bot_cmd(peers: Dictionary, id: int, domination, nav_points: Array, delta: float):
 	var entry: Dictionary = peers[id]
 	var player = entry["player"]
+	# 섬광탄에 눈이 먼 봇은 아무도 보지 못한다.
 	var visible := visible_enemies(peers, id, BOT_SIGHT_RANGE, BOT_NEAR_RANGE)
+	if float(entry["blind"]) > 0.0:
+		visible = []
 	var bot = entry["bot"]
 	var goals := nav_points
 	bot.has_hold = false
@@ -177,3 +184,104 @@ static func choose_primary(entry: Dictionary, id: int) -> bool:
 		player.set_primary(int(entry["primary"]))
 		return true
 	return false
+
+
+## 섬광탄에 눈이 머는 참가자와 정도(0~1). 각 항목은 [id, 정도].
+## 적과 던진 사람만 걸린다. 벽 뒤는 안전하고, 등을 돌리고 있으면 덜 걸린다.
+static func flash_hits(peers: Dictionary, owner_id: int, at: Vector3) -> Array:
+	var hits: Array = []
+	var owner_team := int(peers[owner_id]["team"])
+	var from := at + Vector3.UP * 0.25
+	for id: int in peers:
+		var entry: Dictionary = peers[id]
+		var player = entry["player"]
+		if not player.alive or (id != owner_id and int(entry["team"]) == owner_team):
+			continue
+		var eye: Vector3 = player.eye_position()
+		var distance := from.distance_to(eye)
+		if distance >= Grenades.FLASH_RADIUS:
+			continue
+		var wall: Dictionary = player.weapon.world_ray(from, (eye - from).normalized(), 1)
+		if not wall.is_empty() and from.distance_to(wall["position"]) < distance - 0.3:
+			continue
+		# 고개를 든 정도는 빼고 몸이 향한 방향만 본다(서버는 고개 각도를 따로 들고 있지 않다).
+		var forward := Vector3.FORWARD.rotated(Vector3.UP, player.rotation.y)
+		var toward := from - eye
+		toward.y = 0.0
+		var facing := forward.dot(toward.normalized()) if toward.length() > 0.01 else 1.0
+		var face_factor := remap(clampf(facing, -0.4, 1.0), -0.4, 1.0, 0.2, 1.0)
+		var near_factor := 1.0 - smoothstep(4.0, Grenades.FLASH_RADIUS, distance)
+		var amount := clampf(face_factor * near_factor * 1.25, 0.0, 1.0)
+		if amount >= 0.1:
+			hits.append([id, amount])
+	return hits
+
+
+## 근접 공격에 맞는 적: 눈앞 MELEE_RANGE 안, 시선에서 MELEE_CONE 안, 벽에 막히지 않은 가장 가까운 적.
+## 없으면 빈 배열, 있으면 [id, 맞은 자리].
+static func melee_target(peers: Dictionary, id: int, origin: Vector3, direction: Vector3) -> Array:
+	var team := int(peers[id]["team"])
+	var best: Array = []
+	var best_distance := MELEE_RANGE
+	for other: int in peers:
+		var entry: Dictionary = peers[other]
+		var player = entry["player"]
+		if other == id or int(entry["team"]) == team or not player.alive:
+			continue
+		if float(entry["protected"]) > 0.0:
+			continue
+		var chest: Vector3 = player.global_position + Vector3.UP * (0.7 if player.is_low() else 1.1)
+		var offset := chest - origin
+		var distance := offset.length()
+		if distance > best_distance or direction.dot(offset.normalized()) < cos(MELEE_CONE):
+			continue
+		var wall: Dictionary = player.weapon.world_ray(origin, offset.normalized(), 1)
+		if wall.is_empty() or origin.distance_to(wall["position"]) >= distance - 0.2:
+			best = [other, chest]
+			best_distance = distance
+	return best
+
+
+
+## 참가자 한 명의 서버 쪽 기록. kind는 "local", "bot", "peer".
+static func new_entry(kind: String, player, team: int, entry_name: String) -> Dictionary:
+	return {
+		"fired": false,
+		"since_damage": 999.0,
+		"protected": 0.0,
+		"swap_left": SWAP_TIME,
+		"blind": 0.0,
+		"primary": player.primary,
+		"kind": kind,
+		"player": player,
+		"team": team,
+		"bot": null,
+		"avatar": null,
+		"queue": [],
+		"last_seq": 0,
+		"queued_seq": 0,
+		"history": [],
+		"respawn": 0.0,
+		"kills": 0,
+		"deaths": 0,
+		"name": entry_name,
+	}
+
+
+## 리스폰: 체력, 자세, 로드아웃, 탄약, 수류탄을 되돌리고 보호 시간을 준다(자리는 세션이 정한다).
+static func reset_for_spawn(entry: Dictionary, spawn_protection: float) -> void:
+	var player = entry["player"]
+	player.health = Protocol.MAX_HEALTH
+	player.alive = true
+	player.move_state = 0
+	player.crouching = false
+	player.set_primary(int(entry["primary"]))
+	player.weapon.reset()
+	player.grenades = Grenades.PER_LIFE
+	player.flashes = Grenades.FLASH_PER_LIFE
+	player.melee_cooldown = 0.0
+	entry["protected"] = spawn_protection
+	entry["swap_left"] = SWAP_TIME
+	entry["since_damage"] = 999.0
+	entry["blind"] = 0.0
+	(entry["history"] as Array).clear()

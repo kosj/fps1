@@ -2,8 +2,8 @@ extends Node3D
 ## 수류탄. 던진 순간의 위치와 방향만 주고받고, 서버와 각 클라이언트가 같은 규칙으로 궤적을 계산한다.
 ## 피해는 판정 권한이 있는 쪽만 계산한다(exploded 신호를 받아 처리).
 
-## 터졌을 때. owner_id는 던진 사람, at은 터진 자리.
-signal exploded(owner_id: int, at: Vector3)
+## 터졌을 때. owner_id는 던진 사람, at은 터진 자리, kind는 "frag" 또는 "flash".
+signal exploded(owner_id: int, at: Vector3, kind: String)
 
 const Effects := preload("res://game/fx/effects.gd")
 const SOUND := preload("res://game/audio/sfx/explosion.ogg")
@@ -20,10 +20,15 @@ const MAX_DAMAGE := 150.0
 const FULL_DAMAGE_RADIUS := 1.2
 const BODY_RADIUS := 0.07
 const PER_LIFE := 2
+## 섬광탄: 목숨당 개수, 더 짧은 신관, 효과가 미치는 거리, 완전히 맞았을 때 눈이 머는 시간(초).
+const FLASH_PER_LIFE := 1
+const FLASH_FUSE := 1.6
+const FLASH_RADIUS := 22.0
+const FLASH_TIME := 4.0
 
-## 날아가는 수류탄. 각 항목은 [던진 사람, 노드, 속도, 남은 시간].
+## 날아가는 수류탄. 각 항목은 [던진 사람, 노드, 속도, 남은 시간, 종류].
 var _live: Array = []
-var _mesh: SphereMesh
+var _meshes := {}
 
 
 ## 거리(m)에 따른 폭발 피해. 가까우면 최대, 반경 끝에서 0.
@@ -34,20 +39,39 @@ static func damage_at(distance: float) -> float:
 	return MAX_DAMAGE * falloff
 
 
-func throw(owner_id: int, origin: Vector3, direction: Vector3) -> void:
-	if _mesh == null:
-		_mesh = SphereMesh.new()
-		_mesh.radius = BODY_RADIUS
-		_mesh.height = BODY_RADIUS * 2.4
-		var material := StandardMaterial3D.new()
-		material.albedo_color = Color(0.16, 0.2, 0.13)
-		material.roughness = 0.7
-		_mesh.material = material
+func throw(owner_id: int, origin: Vector3, direction: Vector3, kind := "frag") -> void:
 	var body := MeshInstance3D.new()
-	body.mesh = _mesh
+	body.mesh = _mesh_for(kind)
 	add_child(body)
 	body.global_position = origin + direction * 0.4
-	_live.append([owner_id, body, direction * THROW_SPEED + Vector3.UP * THROW_LIFT, FUSE])
+	var fuse := FLASH_FUSE if kind == "flash" else FUSE
+	_live.append([owner_id, body, direction * THROW_SPEED + Vector3.UP * THROW_LIFT, fuse, kind])
+
+
+## 수류탄은 짙은 녹색 공, 섬광탄은 밝은 회색 원통.
+func _mesh_for(kind: String) -> Mesh:
+	if _meshes.has(kind):
+		return _meshes[kind]
+	var material := StandardMaterial3D.new()
+	material.roughness = 0.6
+	var mesh: PrimitiveMesh
+	if kind == "flash":
+		var can := CylinderMesh.new()
+		can.top_radius = BODY_RADIUS * 0.75
+		can.bottom_radius = BODY_RADIUS * 0.75
+		can.height = BODY_RADIUS * 2.6
+		material.albedo_color = Color(0.72, 0.74, 0.76)
+		material.metallic = 0.6
+		mesh = can
+	else:
+		var ball := SphereMesh.new()
+		ball.radius = BODY_RADIUS
+		ball.height = BODY_RADIUS * 2.4
+		material.albedo_color = Color(0.16, 0.2, 0.13)
+		mesh = ball
+	mesh.material = material
+	_meshes[kind] = mesh
+	return mesh
 
 
 func count() -> int:
@@ -81,16 +105,21 @@ func tick(delta: float) -> void:
 		var body: MeshInstance3D = item[1]
 		var at := body.global_position
 		body.queue_free()
-		_explode(at)
-		exploded.emit(int(item[0]), at)
+		_explode(at, str(item[4]))
+		exploded.emit(int(item[0]), at, str(item[4]))
 	_live = _live.filter(func(entry: Array) -> bool: return float(entry[3]) > 0.0)
 
 
-func _explode(at: Vector3) -> void:
+func _explode(at: Vector3, kind: String) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
-	Effects.explosion(self, at)
 	var audio := AudioStreamPlayer3D.new()
+	if kind == "flash":
+		# 섬광탄: 하얀 섬광. 소리는 폭발음을 높고 짧게 쓴다.
+		Effects.flash_burst(self, at)
+		audio.pitch_scale = 1.7
+	else:
+		Effects.explosion(self, at)
 	audio.stream = SOUND
 	audio.unit_size = 22.0
 	audio.max_distance = 120.0

@@ -8,7 +8,10 @@ extends CharacterBody3D
 
 signal health_changed(health: float)
 ## 수류탄을 던졌을 때. 판정 권한이 있는 쪽(서버, 로컬 대전)만 받아서 실제로 만든다.
-signal grenade_thrown(origin: Vector3, direction: Vector3)
+## kind는 "frag"(수류탄) 또는 "flash"(섬광탄).
+signal grenade_thrown(origin: Vector3, direction: Vector3, kind: String)
+## 근접 공격을 휘둘렀을 때. 맞았는지는 판정 권한이 있는 쪽이 정한다.
+signal melee_swung(origin: Vector3, direction: Vector3)
 
 enum MoveState { NORMAL, SLIDING, MANTLING }
 
@@ -30,6 +33,9 @@ const Armory := preload("res://game/weapons/armory.gd")
 const Settings := preload("res://game/core/settings.gd")
 ## 예측 보정으로 생긴 위치 차이를 화면에서 풀어 주는 속도와, 보간하지 않고 바로 옮기는 거리.
 const CORRECTION_SMOOTHING := 12.0
+## 근접 공격 사이의 간격과, 그중 총을 쏠 수 없는 앞부분(초).
+const MELEE_COOLDOWN := 0.9
+const MELEE_BUSY := 0.45
 const CORRECTION_SNAP_DISTANCE := 2.0
 const DAMAGE_MARK_TIME := 1.5
 ## 터치로 화면을 끌 때의 시선 감도(화면 단위당 라디안).
@@ -72,7 +78,15 @@ var grenades := 2:
 	set(value):
 		grenades = value
 		if hud != null:
-			hud.set_grenades(value)
+			hud.set_grenades(grenades, flashes)
+## 남은 섬광탄.
+var flashes := 1:
+	set(value):
+		flashes = value
+		if hud != null:
+			hud.set_grenades(grenades, flashes)
+## 다음 근접 공격까지 남은 시간(초).
+var melee_cooldown := 0.0
 var view_model: ViewModel
 var hud: Hud
 ## 터치 조작. 터치 기기에서만 만들어진다.
@@ -105,6 +119,8 @@ var _button_actions := {
 	"aim": InputCmd.AIM,
 	"reload": InputCmd.RELOAD,
 	"grenade": InputCmd.GRENADE,
+	"tactical": InputCmd.TACTICAL,
+	"melee": InputCmd.MELEE,
 }
 
 @onready var _head: Node3D = $Head
@@ -178,7 +194,28 @@ func is_low() -> bool:
 
 ## 달리기와 난간 넘기 중에는 조준과 발사를 막는다.
 func blocks_weapon() -> bool:
-	return _sprinting or move_state == MoveState.MANTLING or not alive
+	var swinging := melee_cooldown > MELEE_COOLDOWN - MELEE_BUSY
+	return _sprinting or move_state == MoveState.MANTLING or not alive or swinging
+
+
+## 수류탄(G), 섬광탄(F), 근접 공격(V). 예측을 다시 돌릴 때는 부르지 않는다(한 번만 일어나야 한다).
+func _use_equipment(pressed: int, delta: float) -> void:
+	melee_cooldown = maxf(melee_cooldown - delta, 0.0)
+	if move_state == MoveState.MANTLING or not alive:
+		return
+	var aim := -_head.global_transform.basis.z
+	if (pressed & InputCmd.GRENADE) != 0 and grenades > 0:
+		grenades -= 1
+		grenade_thrown.emit(eye_position(), aim, "frag")
+	if (pressed & InputCmd.TACTICAL) != 0 and flashes > 0:
+		flashes -= 1
+		grenade_thrown.emit(eye_position(), aim, "flash")
+	if (pressed & InputCmd.MELEE) != 0 and melee_cooldown <= 0.0:
+		melee_cooldown = MELEE_COOLDOWN
+		if view_model != null:
+			view_model.play_melee()
+			_play("melee")
+		melee_swung.emit(eye_position(), aim)
 
 
 ## 반동을 시점에 적용할지. 시선을 입력에서 받는 플레이어는 적용하지 않는다.
@@ -251,9 +288,7 @@ func simulate(cmd: InputCmd, delta: float, replay: bool = false) -> void:
 	_update_stance(delta)
 	if replay:
 		return
-	if (pressed & InputCmd.GRENADE) != 0 and grenades > 0 and move_state != MoveState.MANTLING:
-		grenades -= 1
-		grenade_thrown.emit(eye_position(), -_head.global_transform.basis.z)
+	_use_equipment(pressed, delta)
 	weapon.tick(cmd, pressed, delta)
 	_update_footsteps(delta)
 
@@ -584,6 +619,7 @@ func _build_view() -> void:
 	_add_sound("dry", SFX_DRY, 2, -8.0)
 	_add_sound("reload", SFX_RELOAD, 2, -6.0)
 	_add_sound("step", SFX_STEP, 3, -10.0)
+	_add_sound("melee", SfxSynth.whoosh(), 2, -7.0)
 	hud = Hud.new()
 	add_child(hud)
 	view_model = ViewModel.new()

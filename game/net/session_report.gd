@@ -54,3 +54,13 @@ static func _at_least(
 	var seen := int(stats[stat])
 	if seen < wanted:
 		failures.append("expected %d %s, saw %d" % [wanted, what, seen])
+
+
+## 통계와 판정 결과를 찍는다(NETSTATS, NETTEST 줄). 통과했으면 true.
+static func report(role: String, client: bool, args: Dictionary, stats: Dictionary) -> bool:
+	var failures := check(client, args, stats)
+	print("NETSTATS %s %s" % [role, JSON.stringify(stats)])
+	for failure in failures:
+		printerr("NETTEST FAIL %s: %s" % [role, failure])
+	print("NETTEST %s %s" % [role, "ok" if failures.is_empty() else "failed"])
+	return failures.is_empty()

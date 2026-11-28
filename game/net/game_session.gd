@@ -43,6 +43,7 @@ const XpTracker := preload("res://game/match/xp_tracker.gd")
 const Progression := preload("res://game/core/progression.gd")
 const Names := preload("res://game/core/names.gd")
 const Announcer := preload("res://game/audio/announcer.gd")
+const FlashBlind := preload("res://game/fx/flash_blind.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -75,6 +76,8 @@ var stats := {
 	"connected": false,
 	"grenades": 0,
 	"blast_hits": 0,
+	"flashed": 0,
+	"melee_hits": 0,
 	"score_rows": 0,
 	"snapshots": 0,
 	"corrections": 0,
@@ -432,26 +435,8 @@ func _add_participant(id: int, kind: String) -> Dictionary:
 	player.weapon.resolve_shot = _resolve_shot.bind(id)
 	player.weapon.fired.connect(_on_participant_fired.bind(id))
 	player.grenade_thrown.connect(_on_grenade_thrown.bind(id))
-	var entry := {
-		"fired": false,
-		"since_damage": 999.0,
-		"protected": 0.0,
-		"swap_left": Authority.SWAP_TIME,
-		"primary": player.primary,
-		"kind": kind,
-		"player": player,
-		"team": team,
-		"bot": null,
-		"avatar": null,
-		"queue": [],
-		"last_seq": 0,
-		"queued_seq": 0,
-		"history": [],
-		"respawn": 0.0,
-		"kills": 0,
-		"deaths": 0,
-		"name": Names.first_name(id, kind),
-	}
+	player.melee_swung.connect(_on_melee.bind(id))
+	var entry := Authority.new_entry(kind, player, team, Names.first_name(id, kind))
 	# 같은 프로세스에서 화면에 보여야 하는 다른 참가자에게는 임시 몸체를 붙인다.
 	if mode == Mode.LOCAL_MATCH and kind != "local":
 		var avatar := RemoteAvatar.new()
@@ -529,6 +514,7 @@ func _tick_authority(delta: float) -> void:
 		entry["since_damage"] = float(entry["since_damage"]) + delta
 		entry["protected"] = maxf(float(entry["protected"]) - delta, 0.0)
 		entry["swap_left"] = maxf(float(entry["swap_left"]) - delta, 0.0)
+		entry["blind"] = maxf(float(entry["blind"]) - delta, 0.0)
 		player.health = Vitals.regenerate(
 			player.health, Protocol.MAX_HEALTH, float(entry["since_damage"]), delta
 		)
@@ -628,19 +614,8 @@ func _send_scores() -> void:
 
 
 func _respawn(id: int, entry: Dictionary) -> void:
-	var player = entry["player"]
-	_place_at_spawn(player, _pick_spawn(int(entry["team"]), id))
-	player.health = Protocol.MAX_HEALTH
-	player.alive = true
-	player.move_state = 0
-	player.crouching = false
-	player.set_primary(int(entry["primary"]))
-	player.weapon.reset()
-	player.grenades = Grenades.PER_LIFE
-	entry["protected"] = Vitals.SPAWN_PROTECTION
-	entry["swap_left"] = Authority.SWAP_TIME
-	entry["since_damage"] = 999.0
-	(entry["history"] as Array).clear()
+	_place_at_spawn(entry["player"], _pick_spawn(int(entry["team"]), id))
+	Authority.reset_for_spawn(entry, Vitals.SPAWN_PROTECTION)
 
 
 func _send_snapshots() -> void:
@@ -655,7 +630,7 @@ func _send_snapshots() -> void:
 			player.health, player.alive, player.weapon.state.ammo, entry["kills"], entry["deaths"],
 			entry["team"], _team_scores[0], _team_scores[1], _time_left, _intermission_left > 0.0,
 			player.weapon.slot, _domination.state() if _domination != null else [],
-			player.grenades, player.primary,
+			player.grenades, player.primary, player.flashes,
 		]
 		_rpc_snapshot.rpc_id(id, _tick, entry["last_seq"], player.capture_state(), status, others)
 
@@ -745,21 +720,41 @@ func _apply_damage(
 		Effects.hit_puff(self, at)
 
 
-## 수류탄: 던진 사실을 모두에게 알리고, 터지면 반경 안의 적(과 던진 사람)에게 피해를 준다.
-func _on_grenade_thrown(origin: Vector3, direction: Vector3, id: int) -> void:
-	_grenades.throw(id, origin, direction)
+## 수류탄과 섬광탄: 던진 사실을 모두에게 알린다. 터지면 수류탄은 피해를, 섬광탄은 눈부심을 준다.
+func _on_grenade_thrown(origin: Vector3, direction: Vector3, kind: String, id: int) -> void:
+	_grenades.throw(id, origin, direction, kind)
 	stats["grenades"] += 1
 	for peer_id: int in _peers:
 		if str(_peers[peer_id]["kind"]) == "peer":
-			_rpc_grenade.rpc_id(peer_id, origin, direction)
+			_rpc_grenade.rpc_id(peer_id, origin, direction, kind)
 
 
-func _on_grenade_exploded(owner_id: int, at: Vector3) -> void:
+func _on_grenade_exploded(owner_id: int, at: Vector3, kind: String) -> void:
 	if mode == Mode.CLIENT or not _peers.has(owner_id):
+		return
+	if kind == "flash":
+		for hit: Array in Authority.flash_hits(_peers, owner_id, at):
+			stats["flashed"] += 1
+			var entry: Dictionary = _peers[hit[0]]
+			entry["blind"] = float(hit[1]) * Grenades.FLASH_TIME
+			if str(entry["kind"]) == "peer":
+				_rpc_flashed.rpc_id(hit[0], hit[1])
+			elif str(entry["kind"]) == "local":
+				FlashBlind.apply(entry["player"].hud, hit[1])
 		return
 	for hit: Array in Authority.blast_hits(_peers, owner_id, at):
 		stats["blast_hits"] += 1
 		_apply_damage(owner_id, hit[0], hit[1], false, hit[2])
+
+
+## 근접 공격: 판정은 서버(와 혼자 하는 경기)에서만 한다.
+func _on_melee(origin: Vector3, direction: Vector3, id: int) -> void:
+	if mode == Mode.CLIENT or not _peers.has(id):
+		return
+	var hit := Authority.melee_target(_peers, id, origin, direction)
+	if not hit.is_empty():
+		stats["melee_hits"] += 1
+		_apply_damage(id, hit[0], Authority.MELEE_DAMAGE, false, hit[1])
 
 
 func _announce_kill(killer: int, victim: int, killer_team: int, headshot: bool) -> void:
@@ -919,8 +914,14 @@ func _rpc_loadout(id: int) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _rpc_grenade(origin: Vector3, direction: Vector3) -> void:
-	_grenades.throw(0, origin, direction)
+func _rpc_grenade(origin: Vector3, direction: Vector3, kind: String) -> void:
+	_grenades.throw(0, origin, direction, kind)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_flashed(amount: float) -> void:
+	if _local != null:
+		FlashBlind.apply(_local.hud, amount)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -961,6 +962,8 @@ func _apply_snapshot(
 	)
 	if _local.grenades != int(status[12]):
 		_local.grenades = int(status[12])
+	if status.size() > 14 and _local.flashes != int(status[14]):
+		_local.flashes = int(status[14])
 	_view.show_match(
 		_local.hud,
 		[status[5], status[6], status[7], status[8], status[9], status[3], status[4], status[1]]
@@ -991,9 +994,4 @@ func _finish() -> void:
 		role = "server"
 	elif mode == Mode.CLIENT:
 		role = "client:%s" % str(_args.get("bot", "human"))
-	var failures := SessionReport.check(mode == Mode.CLIENT, _args, stats)
-	print("NETSTATS %s %s" % [role, JSON.stringify(stats)])
-	for failure in failures:
-		printerr("NETTEST FAIL %s: %s" % [role, failure])
-	print("NETTEST %s %s" % [role, "ok" if failures.is_empty() else "failed"])
-	get_tree().quit(0 if failures.is_empty() else 1)
+	get_tree().quit(0 if SessionReport.report(role, mode == Mode.CLIENT, _args, stats) else 1)

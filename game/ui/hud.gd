@@ -17,6 +17,7 @@ var _ammo_label: Label
 var _weapon_label: Label
 var _weapon_name := ""
 var _grenades := 2
+var _flashes := 1
 var _status_label: Label
 var _hint_label: Label
 var _health_label: Label
@@ -90,7 +91,7 @@ func _ready() -> void:
 	_hint_label.offset_top = -120
 	_hint_label.offset_bottom = -90
 	_hint_label.text = (
-		"Click to play | WASD  Shift  Ctrl  Space  1-2 weapons  G grenade  -/= sensitivity"
+		"Click to play | WASD  Shift  Ctrl  Space  1-2 weapons  G grenade  F flash  V melee"
 	)
 
 
@@ -306,13 +307,15 @@ func set_weapon_name(weapon_name: String) -> void:
 	_show_weapon_line()
 
 
-func set_grenades(count: int) -> void:
-	_grenades = count
+## 남은 수류탄(G)과 섬광탄(F).
+func set_grenades(frags: int, flashes: int) -> void:
+	_grenades = frags
+	_flashes = flashes
 	_show_weapon_line()
 
 
 func _show_weapon_line() -> void:
-	_weapon_label.text = "%s   G x%d" % [_weapon_name, _grenades]
+	_weapon_label.text = "%s   G x%d  F x%d" % [_weapon_name, _grenades, _flashes]
 
 
 func set_reloading(reloading: bool) -> void:

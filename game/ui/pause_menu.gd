@@ -42,7 +42,8 @@ func _ready() -> void:
 		column.add_child(MenuKit.label("DUCK while sprinting: slide    JUMP at a ledge: climb", 18))
 	else:
 		column.add_child(MenuKit.label("WASD move    Shift sprint    Ctrl crouch / slide", 18))
-		column.add_child(MenuKit.label("Space jump / mantle    R reload    G grenade", 18))
+		column.add_child(MenuKit.label("Space jump / mantle    R reload", 18))
+		column.add_child(MenuKit.label("G grenade    F flashbang    V melee", 18))
 		column.add_child(MenuKit.label("LMB fire    RMB aim    1 primary / 2 pistol (or wheel)", 18))
 	menu_button = MenuKit.button("MAIN MENU")
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())

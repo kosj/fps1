@@ -12,6 +12,8 @@ const KEY_ACTIONS := {
 	"crouch": KEY_CTRL,
 	"reload": KEY_R,
 	"grenade": KEY_G,
+	"tactical": KEY_F,
+	"melee": KEY_V,
 	"weapon_1": KEY_1,
 	"weapon_2": KEY_2,
 	"scoreboard": KEY_TAB,
