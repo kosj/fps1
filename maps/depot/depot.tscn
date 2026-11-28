@@ -32,8 +32,8 @@ fog_light_color = Color(0.72, 0.74, 0.78, 1)
 fog_density = 0.004
 fog_sky_affect = 0.2
 adjustment_enabled = true
-adjustment_contrast = 1.08
-adjustment_saturation = 1.05
+adjustment_contrast = 1.12
+adjustment_saturation = 1.18
 
 [sub_resource type="StandardMaterial3D" id="floor_material"]
 albedo_color = Color(0.27, 0.28, 0.3, 1)
