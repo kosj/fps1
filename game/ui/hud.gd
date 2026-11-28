@@ -209,11 +209,16 @@ func _process(delta: float) -> void:
 	_notice_left = maxf(_notice_left - delta, 0.0)
 	_notice.visible = _notice_left > 0.0
 	_notice.modulate.a = clampf(_notice_left * 3.0, 0.0, 1.0)
+	# 점수판이나 결과가 떠 있으면 터치 버튼을 흐리게 해 가리지 않게 한다(버튼은 그대로 눌린다).
+	var board := _scoreboard != null and _scoreboard.visible
+	var covered := board or (_result != null and _result.visible)
 	if _touch != null:
-		# 점수판이나 결과가 떠 있으면 터치 버튼을 흐리게 해 가리지 않게 한다(버튼은 그대로 눌린다).
-		var board := _scoreboard != null and _scoreboard.visible
-		var covered := board or (_result != null and _result.visible)
 		_touch.modulate.a = move_toward(_touch.modulate.a, 0.22 if covered else 1.0, delta * 6.0)
+	# 경험치 알림 같은 팝업은 그 화면들과 사망 카드에 겹치지 않게 숨긴다.
+	var hide_popups := covered or (_death != null and _death.visible)
+	for popup in get_tree().get_nodes_in_group(&"hud_popups"):
+		if popup is CanvasItem and is_ancestor_of(popup):
+			(popup as CanvasItem).visible = not hide_popups
 
 
 ## 화면 가운데에 세로로 쌓는 묶음(결과, 점수판)과 그 뒤를 어둡게 하는 막.
