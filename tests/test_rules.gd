@@ -218,13 +218,17 @@ func test_xp_tracker_awards_kills_and_one_match_result() -> String:
 	return ""
 
 
-func test_names_are_cleaned_and_kept_unique() -> String:
+func test_names_are_cleaned() -> String:
 	if Names.sanitize("  Ace   of <b>Spades</b>!!  ") != "Ace of bSpadesb":
 		return "sanitize gave '%s'" % Names.sanitize("  Ace   of <b>Spades</b>!!  ")
 	if Names.sanitize("한글이름") != "" or Names.sanitize("   ") != "":
 		return "names without allowed letters should become empty"
 	if Names.sanitize("x".repeat(40)).length() != Names.MAX_LENGTH:
 		return "long names are not cut"
+	return ""
+
+
+func test_server_renames_keep_names_unique() -> String:
 	var peers := {1: {"name": "Viper"}, 2: {"name": "P-2"}}
 	if not Names.rename(peers, 2, "Viper") or peers[2]["name"] != "Viper2":
 		return "a taken name was not made unique: %s" % peers[2]["name"]
