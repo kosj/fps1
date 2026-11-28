@@ -42,6 +42,7 @@ const Prediction := preload("res://game/net/prediction.gd")
 const XpTracker := preload("res://game/match/xp_tracker.gd")
 const Progression := preload("res://game/core/progression.gd")
 const Names := preload("res://game/core/names.gd")
+const Announcer := preload("res://game/audio/announcer.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -892,11 +893,15 @@ func _saved_primary() -> int:
 	return Progression.allowed_primary(saved, Armory.DEFAULT_PRIMARY)
 
 
-## 경험치(연습장 제외). 테스트용 스크립트 봇과 화면 없는 실행은 세기만 하고 저장하지 않는다.
+## 경험치와 아나운서(연습장 제외). 테스트용 스크립트 봇과 화면 없는 실행은 경험치를 세기만 하고
+## 저장하지 않으며 아나운서도 없다.
 func _start_xp() -> void:
 	if _local != null:
 		var keep := _bot == null and DisplayServer.get_name() != "headless"
 		_view.xp = XpTracker.new(_local.hud, keep)
+		if keep:
+			_view.announcer = Announcer.new()
+			add_child(_view.announcer)
 
 
 ## 접속한 사람의 이름. 다듬어서 다른 사람과 겹치지 않게 한 뒤 모두에게 점수판으로 알린다.

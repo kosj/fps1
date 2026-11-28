@@ -9,6 +9,8 @@ const GAME_MODE := "match/mode"
 const MAP := "match/map"
 ## 고른 주무기 번호(game/weapons/armory.gd).
 const PRIMARY := "loadout/primary"
+## 시작 화면 음악과 판 결과 음악(아나운서 목소리는 늘 나온다).
+const MUSIC := "audio/music"
 const DIFFICULTY := "match/difficulty"
 const LOW_GRAPHICS := "video/low"
 ## 터치 조작: "auto"(기기를 보고 판단), "on", "off".
