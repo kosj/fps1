@@ -153,10 +153,15 @@ jobs:
       # 실제 인터넷의 공용 서버에 접속해 본다. PR 제목이나 커밋 메시지에 server-check가 있을 때만 돈다.
       # 서버가 쉬고 있으면 깨어나는 데 1분쯤 걸리므로 넉넉히 기다리고, 실패해도 빌드는 막지 않는다.
       - name: Connect to the public server
-        if: contains(github.event.pull_request.title, 'server-check') || contains(github.event.head_commit.message, 'server-check')
+        # PR 제목이나 커밋 메시지에 server-check가 있거나, 손으로 실행(workflow_dispatch)했을 때만 돈다.
+        if: >-
+          contains(github.event.pull_request.title, 'server-check') ||
+          contains(github.event.head_commit.message, 'server-check') ||
+          github.event_name == 'workflow_dispatch'
         continue-on-error: true
         run: |
           timeout 200 ~/godot/godot --headless -- --connect=wss://fps1-server.onrender.com --bot=shooter \
+            --primary=1 --expect-primary=1 \
             --exit-after=110 2>&1 | tee public.log
           grep -E "NETSTATS|NETTEST|network:" public.log
 
