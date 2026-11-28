@@ -11,6 +11,7 @@ const Armory := preload("res://game/weapons/armory.gd")
 const LoadoutPanel := preload("res://game/ui/loadout_panel.gd")
 const Progression := preload("res://game/core/progression.gd")
 const Names := preload("res://game/core/names.gd")
+const MenuMusic := preload("res://game/audio/menu_music.gd")
 ## 공용 서버(Render 무료 요금제). 예전 기본값(내 PC)이 저장돼 있으면 이 주소로 바꿔 보여 준다.
 const DEFAULT_ADDRESS := "wss://fps1-server.onrender.com"
 const OLD_DEFAULT_ADDRESS := "127.0.0.1:7777"
@@ -38,6 +39,7 @@ var mode_select: OptionButton
 var map_select: OptionButton
 var difficulty_select: OptionButton
 var low_graphics: CheckButton
+var music_toggle: CheckButton
 
 var _camera: Camera3D
 var _orbit := 0.6
@@ -114,6 +116,18 @@ func _ready() -> void:
 	range_button = MenuKit.button("SHOOTING RANGE")
 	range_button.pressed.connect(func() -> void: start_requested.emit("range", {}))
 	left.add_child(range_button)
+	var music := MenuMusic.new()
+	add_child(music)
+	music_toggle = CheckButton.new()
+	music_toggle.text = "Music"
+	music_toggle.add_theme_font_size_override("font_size", 18)
+	music_toggle.button_pressed = bool(Settings.read(Settings.MUSIC, true))
+	music_toggle.toggled.connect(
+		func(enabled: bool) -> void:
+			Settings.write(Settings.MUSIC, enabled)
+			music.refresh()
+	)
+	left.add_child(music_toggle)
 	if left == right:
 		column.add_child(_spacer(4.0))
 

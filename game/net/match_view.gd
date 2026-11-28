@@ -6,6 +6,11 @@ const ZoneMarker := preload("res://game/match/zone_marker.gd")
 const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const Protocol := preload("res://game/net/net_protocol.gd")
 const XpTracker := preload("res://game/match/xp_tracker.gd")
+const Announcer := preload("res://game/audio/announcer.gd")
+## 판이 막 시작한 것으로 보는 남은 시간(초). 판 길이는 game_session.gd의 MATCH_TIME(300초).
+const FRESH_MATCH_TIME := 295.0
+## 이 시간(초)이 남았을 때 "1분 남았다"고 알린다.
+const LAST_MINUTE := 60.0
 const TEAM_NAMES := ["BLUE", "RED"]
 const ALLY_COLOR := Color(0.25, 0.45, 0.9)
 const ENEMY_COLOR := Color(0.85, 0.25, 0.2)
@@ -17,10 +22,16 @@ var own_team := 0
 var xp: XpTracker
 ## 참가자 이름(id -> 이름). 점수판 줄에서 배운다.
 var names := {}
+## 아나운서. 사람이 화면을 보는 경기에서만 있다.
+var announcer: Announcer
 
 var _markers: Array = []
 ## 나를 마지막으로 죽인 사람. 리스폰을 기다리는 동안 보여 준다.
 var _killed_by := ""
+## 지난번에 본 판 상태(아나운서가 바뀐 순간을 알아채는 데 쓴다). 남은 시간이 음수면 아직 못 봤다.
+var _was_over := false
+var _last_time := -1.0
+var _zone_owners: Array = []
 
 
 func relative_color(team: int) -> Color:
@@ -49,8 +60,39 @@ func learn_names(rows: Array) -> void:
 
 ## 거점 표시와 HUD를 갱신한다. zones는 맵의 거점 목록([이름, 중심]),
 ## states의 각 항목은 [소유 팀, 진행도, 점령 중인 팀]. hud는 없을 수 있다.
+## 판의 흐름에 맞춰 아나운서에게 말을 시킨다: 시작, 1분 남음, 결과.
+func _announce(over: bool, time_left: float, own: int, other: int) -> void:
+	var first := _last_time < 0.0
+	if not over and (first or _was_over) and time_left >= FRESH_MATCH_TIME:
+		announcer.announce("start")
+	elif not over and _last_time > LAST_MINUTE and time_left <= LAST_MINUTE:
+		announcer.announce("one_minute")
+	if over and not _was_over and not first:
+		var result := "draw"
+		if own != other:
+			result = "victory" if own > other else "defeat"
+		announcer.announce(result)
+
+
+## 거점의 주인이 바뀌면 알린다. 판이 막 시작했거나 끝났을 때(초기화)는 말하지 않는다.
+func _announce_zones(states: Array) -> void:
+	announcer.domination = true
+	var owners: Array = states.map(func(row: Array) -> int: return int(row[0]))
+	var settled := not _was_over and _last_time >= 0.0 and _last_time < FRESH_MATCH_TIME
+	if settled and owners.size() == _zone_owners.size():
+		for index in owners.size():
+			if owners[index] == _zone_owners[index]:
+				continue
+			if int(owners[index]) == own_team:
+				announcer.announce("zone_taken")
+			elif int(_zone_owners[index]) == own_team:
+				announcer.announce("zone_lost")
+	_zone_owners = owners
+
+
 ## 맵이 바뀌면 거점 표시를 지운다. 다음 show_zones가 새 맵의 거점으로 다시 만든다.
 func clear_zones() -> void:
+	_zone_owners.clear()
 	for marker: Node in _markers:
 		marker.queue_free()
 	_markers.clear()
@@ -59,6 +101,8 @@ func clear_zones() -> void:
 func show_zones(parent: Node, hud, zones: Array, states: Array) -> void:
 	if states.is_empty():
 		return
+	if announcer != null:
+		_announce_zones(states)
 	while _markers.size() < zones.size():
 		var zone: Array = zones[_markers.size()]
 		var marker := ZoneMarker.new(str(zone[0]))
@@ -97,11 +141,20 @@ func show_kill(
 
 ## 점수판과 가운데 안내 문구. status는 [팀, 0팀 점수, 1팀 점수, 남은 시간, 종료 여부, 킬, 데스, 생존].
 func show_match(hud, status: Array) -> void:
-	if hud == null:
-		return
 	var team: int = status[0]
 	var score_a: int = status[1]
 	var score_b: int = status[2]
+	var own := score_a if team == 0 else score_b
+	var other := score_b if team == 0 else score_a
+	# 경험치와 아나운서는 화면이 없어도(테스트) 판의 흐름을 따라간다.
+	if xp != null:
+		xp.on_match_state(bool(status[4]), own, other)
+	if announcer != null:
+		_announce(bool(status[4]), float(status[3]), own, other)
+	_was_over = bool(status[4])
+	_last_time = float(status[3])
+	if hud == null:
+		return
 	var seconds := int(ceilf(float(status[3])))
 	var clock := "%d:%02d" % [seconds / 60, seconds % 60]
 	if hud.is_narrow():
@@ -118,10 +171,6 @@ func show_match(hud, status: Array) -> void:
 			]
 		)
 	var message := ""
-	var own := score_a if team == 0 else score_b
-	var other := score_b if team == 0 else score_a
-	if xp != null:
-		xp.on_match_state(bool(status[4]), own, other)
 	if bool(status[4]):
 		var title := "DRAW"
 		var color := Color(0.9, 0.9, 0.9)

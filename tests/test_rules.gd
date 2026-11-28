@@ -10,6 +10,8 @@ const Authority := preload("res://game/net/authority.gd")
 const Progression := preload("res://game/core/progression.gd")
 const XpTracker := preload("res://game/match/xp_tracker.gd")
 const Names := preload("res://game/core/names.gd")
+const MatchView := preload("res://game/net/match_view.gd")
+const Announcer := preload("res://game/audio/announcer.gd")
 const EYE := Vector3(0.0, 1.6, 0.0)
 
 
@@ -236,4 +238,49 @@ func test_server_renames_keep_names_unique() -> String:
 		return "an empty name should be refused"
 	if Names.rename(peers, 9, "Ghost"):
 		return "renaming someone who is not there should fail"
+	return ""
+
+
+## 판 상태 줄: [내 팀, 파랑 점수, 빨강 점수, 남은 시간, 끝남, 킬, 데스, 살아 있음].
+func _status(blue: int, red: int, left: float, over: bool) -> Array:
+	return [0, blue, red, left, over, 0, 0, true]
+
+
+func test_announcer_follows_the_match() -> String:
+	var view := MatchView.new()
+	var voice := Announcer.new()
+	view.announcer = voice
+	view.show_match(null, _status(0, 0, 299.0, false))
+	view.show_match(null, _status(3, 1, 200.0, false))
+	view.show_match(null, _status(20, 12, 61.0, false))
+	view.show_match(null, _status(21, 12, 59.5, false))
+	view.show_match(null, _status(30, 12, 0.0, true))
+	view.show_match(null, _status(30, 12, 0.0, true))
+	view.show_match(null, _status(0, 0, 300.0, false))
+	var heard := voice.pending()
+	voice.free()
+	if heard != ["start", "one_minute", "victory", "start"]:
+		return "the announcer queued %s" % [heard]
+	return ""
+
+
+func test_announcer_reports_zone_changes_but_not_resets() -> String:
+	var view := MatchView.new()
+	var voice := Announcer.new()
+	view.announcer = voice
+	view.own_team = 0
+	view.show_match(null, _status(0, 0, 250.0, false))
+	view._announce_zones([[-1, 0.0, -1], [-1, 0.0, -1], [-1, 0.0, -1]])
+	view._announce_zones([[0, 0.0, -1], [-1, 0.0, -1], [-1, 0.0, -1]])
+	view._announce_zones([[1, 0.0, -1], [-1, 0.0, -1], [1, 0.0, -1]])
+	# 판이 끝나 거점이 초기화되는 동안에는 말하지 않는다.
+	view.show_match(null, _status(100, 150, 0.0, true))
+	view._announce_zones([[-1, 0.0, -1], [-1, 0.0, -1], [-1, 0.0, -1]])
+	var heard := voice.pending()
+	var flagged := voice.domination
+	voice.free()
+	if heard != ["zone_taken", "zone_lost", "defeat"]:
+		return "zone announcements were %s" % [heard]
+	if not flagged:
+		return "seeing zones should switch the start line to domination"
 	return ""
