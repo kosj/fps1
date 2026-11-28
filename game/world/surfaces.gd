@@ -27,6 +27,13 @@ const KINDS := {
 	"plaster_far": ["yellow_plaster", 0.2, Color(0.8, 0.72, 0.62)],
 	"brick": ["red_brick_03", 0.45, Color(0.9, 0.85, 0.8)],
 	"roof": ["corrugated_iron_02", 0.3, Color(0.5, 0.42, 0.36)],
+	# Outpost 맵
+	"snow": ["snow_02", 0.35, Color(0.8, 0.83, 0.88)],
+	"stone": ["castle_wall_slates", 0.4, Color(0.66, 0.68, 0.72)],
+	"planks": ["dark_planks", 0.5, Color(0.95, 0.9, 0.85)],
+	"planks_far": ["dark_planks", 0.3, Color(0.72, 0.68, 0.64)],
+	"roof_snow": ["snow_02", 0.5, Color(0.86, 0.88, 0.92)],
+	"shed": ["box_profile_metal_sheet", 0.5, Color(0.9, 0.9, 0.9)],
 }
 const PROP_DIR := "res://maps/props/"
 

@@ -107,7 +107,8 @@ static func _contact_material(inner: Vector2, strength: float) -> ShaderMaterial
 
 
 ## 경기장 밖 건물 하나: 몸체, 지붕, 경기장 쪽 벽의 문과 창, 접지 그림자.
-## kind가 "warehouse"면 박공지붕 창고, 아니면 평지붕에 난간이 있는 집.
+## kind가 "warehouse"면 박공지붕 창고, "planks_far"면 눈 덮인 박공지붕 통나무집,
+## 아니면 평지붕에 난간이 있는 집.
 static func add_building(parent: Node3D, center: Vector3, size: Vector3, kind: String) -> void:
 	_add_mesh(parent, _box(size), center, Surfaces.material(kind))
 	# 경기장(원점)을 바라보는 벽: x와 z 중 원점 쪽으로 더 많이 드러난 면.
@@ -122,6 +123,8 @@ static func add_building(parent: Node3D, center: Vector3, size: Vector3, kind: S
 	var face := center + facing * (depth * 0.5 + 0.03) - Vector3.UP * center.y
 	if kind == "warehouse":
 		_add_warehouse_details(parent, center, size, face, along, width)
+	elif kind == "planks_far":
+		_add_cabin_details(parent, center, size, face, along, width)
 	else:
 		_add_house_details(parent, center, size, face, along, width, kind)
 	add_contact_shadow(parent, center, size)
@@ -131,15 +134,10 @@ static func add_building(parent: Node3D, center: Vector3, size: Vector3, kind: S
 static func _add_warehouse_details(
 	parent: Node3D, center: Vector3, size: Vector3, face: Vector3, along: Vector3, width: float
 ) -> void:
-	var prism := PrismMesh.new()
-	var long_x := size.x >= size.z
-	prism.size = Vector3(size.z if long_x else size.x, size.y * 0.22, size.x if long_x else size.z)
-	var top := center.y + size.y * 0.5
-	var roof := _add_mesh(
-		parent, prism, Vector3(center.x, top + prism.size.y * 0.5, center.z),
-		_flat(Color(0.32, 0.34, 0.36), 0.7)
+	var top := center + Vector3.UP * size.y * 0.5
+	add_gable_roof(
+		parent, top, Vector2(size.x, size.z), size.y * 0.22, _flat(Color(0.32, 0.34, 0.36), 0.7)
 	)
-	roof.rotation.y = PI * 0.5 if long_x else 0.0
 	var door_height := minf(5.0, size.y * 0.55)
 	for side: float in [-0.25, 0.25]:
 		_add_mesh(
@@ -151,6 +149,35 @@ static func _add_warehouse_details(
 		parent, _face_box(along, width * 0.85, 0.9), face + Vector3.UP * size.y * 0.82,
 		_flat(Color(0.08, 0.1, 0.12), 0.25)
 	)
+
+
+## 통나무집: 처마가 나온 눈 덮인 박공지붕, 문 하나, 양옆 창.
+static func _add_cabin_details(
+	parent: Node3D, center: Vector3, size: Vector3, face: Vector3, along: Vector3, width: float
+) -> void:
+	var top := center + Vector3.UP * size.y * 0.5
+	var eaves := Vector2(size.x, size.z) + Vector2.ONE * 0.8
+	add_gable_roof(parent, top, eaves, minf(size.x, size.z) * 0.45, Surfaces.material("roof_snow"))
+	var dark := _flat(Color(0.07, 0.06, 0.05), 0.4, 0.0)
+	_add_mesh(parent, _face_box(along, 1.2, 2.1), face + Vector3.UP * 1.05, dark)
+	for side: float in [-0.3, 0.3]:
+		var spot := face + along * width * side + Vector3.UP * 1.7
+		_add_mesh(parent, _face_box(along, 1.0, 0.9), spot, dark)
+
+
+## 박공지붕: 처마 밑면이 top(지붕 바닥 가운데)에 오고, 용마루가 긴 쪽으로 지나간다.
+## footprint는 [x, z] 크기, height는 용마루까지의 높이.
+static func add_gable_roof(
+	parent: Node3D, top: Vector3, footprint: Vector2, height: float, material: Material
+) -> MeshInstance3D:
+	var prism := PrismMesh.new()
+	var long_x := footprint.x >= footprint.y
+	var span := footprint.y if long_x else footprint.x
+	var length := footprint.x if long_x else footprint.y
+	prism.size = Vector3(span, height, length)
+	var roof := _add_mesh(parent, prism, top + Vector3.UP * height * 0.5, material)
+	roof.rotation.y = PI * 0.5 if long_x else 0.0
+	return roof
 
 
 ## 집: 평지붕 난간과 층마다 작은 창들.
@@ -196,12 +223,120 @@ static func _add_mesh(
 	return instance
 
 
-static func _flat(color: Color, roughness: float) -> StandardMaterial3D:
-	var key := "%s/%.2f" % [color.to_html(), roughness]
+## 텍스처 없는 칠한 재질. 금속(창고 지붕, 문)은 metallic을 그대로 두고, 나무와 잎은 0으로 준다.
+static func _flat(color: Color, roughness: float, metallic := 0.3) -> StandardMaterial3D:
+	var key := "%s/%.2f/%.2f" % [color.to_html(), roughness, metallic]
 	if not _flat_materials.has(key):
 		var material := StandardMaterial3D.new()
 		material.albedo_color = color
 		material.roughness = roughness
-		material.metallic = 0.3
+		material.metallic = metallic
 		_flat_materials[key] = material
 	return _flat_materials[key]
+
+
+## 경기장 둘레의 전나무 숲. inner(경기장 가로·세로 절반)보다 margin만큼 밖에서 radius까지
+## 흩어 심는다. avoid의 [중심, 크기] 상자(배경 건물) 자리는 비운다. 멀티메시라 수백 그루도 가볍다.
+static func add_pines(
+	parent: Node3D, inner: Vector2, margin: float, radius: float, count: int, avoid: Array
+) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20261128
+	var spots: Array[Transform3D] = []
+	var tries := 0
+	while spots.size() < count and tries < count * 20:
+		tries += 1
+		var at := Vector3(rng.randf_range(-radius, radius), 0.0, rng.randf_range(-radius, radius))
+		if absf(at.x) < inner.x + margin and absf(at.z) < inner.y + margin:
+			continue
+		if Vector2(at.x, at.z).length() > radius or _inside_any(at, avoid, 3.0):
+			continue
+		var scale := rng.randf_range(0.75, 1.5)
+		var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * scale)
+		spots.append(Transform3D(basis, at))
+	var bark := _flat(Color(0.12, 0.09, 0.07), 0.9, 0.0)
+	var needles := _flat(Color(0.035, 0.08, 0.055), 0.95, 0.0)
+	var snowy := _flat(Color(0.7, 0.74, 0.78), 0.8, 0.0)
+	_add_pine_part(parent, spots, _cone(0.28, 0.2, 2.4), Vector3(0, 1.2, 0), bark)
+	# 아래에서 위로 좁아지는 가지 층 셋. 맨 위는 눈이 쌓여 희다.
+	_add_pine_part(parent, spots, _cone(2.4, 0.0, 4.2), Vector3(0, 3.6, 0), needles)
+	_add_pine_part(parent, spots, _cone(1.8, 0.0, 3.6), Vector3(0, 5.6, 0), needles)
+	_add_pine_part(parent, spots, _cone(1.1, 0.0, 2.6), Vector3(0, 7.5, 0), snowy)
+
+
+## 멀리 둘러선 눈 덮인 산줄기. 반지름 radius의 원을 따라 세운 한 겹짜리 실루엣으로,
+## 아래(바위색 low)에서 위(눈색 high)로 색이 바뀐다. 안개 대신 색을 미리 하늘빛에 섞어 둔다.
+static func add_mountains(
+	parent: Node3D, radius: float, height: float, low: Color, high: Color
+) -> void:
+	const SEGMENTS := 180
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var phases: Array[float] = []
+	for i in 4:
+		phases.append(rng.randf() * TAU)
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var ring: Array[Vector3] = []
+	for i in SEGMENTS + 1:
+		var angle := TAU * i / SEGMENTS
+		# 여러 주기의 사인파를 겹치고 날카롭게 만들어 봉우리를 만든다.
+		var ridge := 0.5 + 0.25 * sin(angle * 3.0 + phases[0]) + 0.2 * sin(angle * 7.0 + phases[1])
+		ridge += 0.12 * absf(sin(angle * 17.0 + phases[2])) + 0.06 * sin(angle * 31.0 + phases[3])
+		ring.append(Vector3(sin(angle) * radius, maxf(ridge, 0.15) * height, cos(angle) * radius))
+	for i in SEGMENTS:
+		var a := ring[i]
+		var b := ring[i + 1]
+		var a_low := Vector3(a.x, -40.0, a.z)
+		var b_low := Vector3(b.x, -40.0, b.z)
+		for vertex: Array in [[a_low, low], [a, high], [b, high], [a_low, low], [b, high], [b_low, low]]:
+			tool.set_color(vertex[1])
+			tool.add_vertex(vertex[0])
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.vertex_color_use_as_albedo = true
+	material.vertex_color_is_srgb = true
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.disable_fog = true
+	var instance := MeshInstance3D.new()
+	instance.mesh = tool.commit()
+	instance.material_override = material
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(instance)
+
+
+static func _add_pine_part(
+	parent: Node3D, spots: Array[Transform3D], mesh: Mesh, offset: Vector3, material: Material
+) -> void:
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = mesh
+	multimesh.instance_count = spots.size()
+	for i in spots.size():
+		var spot := spots[i]
+		multimesh.set_instance_transform(i, Transform3D(spot.basis, spot.origin + spot.basis * offset))
+	var instance := MultiMeshInstance3D.new()
+	instance.multimesh = multimesh
+	instance.material_override = material
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(instance)
+
+
+static func _cone(bottom: float, top: float, height: float) -> CylinderMesh:
+	var mesh := CylinderMesh.new()
+	mesh.bottom_radius = bottom
+	mesh.top_radius = top
+	mesh.height = height
+	mesh.radial_segments = 12
+	mesh.rings = 1
+	return mesh
+
+
+static func _inside_any(at: Vector3, boxes: Array, margin: float) -> bool:
+	for box: Array in boxes:
+		var center: Vector3 = box[0]
+		var size: Vector3 = box[1]
+		var near_x := absf(at.x - center.x) < size.x * 0.5 + margin
+		if near_x and absf(at.z - center.z) < size.z * 0.5 + margin:
+			return true
+	return false

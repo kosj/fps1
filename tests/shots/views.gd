@@ -19,6 +19,12 @@ const VIEWS := {
 		[Vector3(-22, 1.6, 7), Vector3(-8, 1.4, 0)],
 		[Vector3(6, 1.6, -4.5), Vector3(-4, 1.2, 6)],
 	],
+	"outpost": [
+		[Vector3(-30, 24, 48), Vector3(0, 0, 0)],
+		[Vector3(0, 1.6, 30), Vector3(0, 1.4, 8)],
+		[Vector3(-7, 1.6, 12), Vector3(14.5, 1.6, -2)],
+		[Vector3(-18, 1.6, 4.8), Vector3(-17, 1.2, -5)],
+	],
 }
 var _frame := 0
 var _view := 0

@@ -3,6 +3,8 @@ extends RefCounted
 const NavGraph := preload("res://game/bots/nav_graph.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const InputCmd := preload("res://game/player/input_cmd.gd")
+const ArenaBase := preload("res://maps/arena_base.gd")
+const Catalog := preload("res://maps/catalog.gd")
 ## ㄷ자 길: 0 -(동쪽)- 1 -(북쪽)- 2. 0과 2 사이에는 벽이 있다고 가정한다.
 const GRAPH := {
 	"points": [Vector3(0.0, 0.0, 0.0), Vector3(10.0, 0.0, 0.0), Vector3(10.0, 0.0, -10.0)],
@@ -39,4 +41,39 @@ func test_bot_walks_the_route_instead_of_a_straight_line() -> String:
 	# 목적지는 북동쪽이지만 길은 먼저 동쪽(+x)으로 난다. yaw -90도가 동쪽이다.
 	if absf(angle_difference(cmd.yaw, -PI / 2.0)) > 0.05:
 		return "bot should first head east along the graph, yaw was %f" % cmd.yaw
+	return ""
+
+
+## 가운데 선 위의 비(非)거점 지점은 180도 돌린 짝과 이어져야 양쪽 골목이 한 길이 된다.
+func test_line_nodes_join_both_halves() -> String:
+	var arena: Node3D = ArenaBase.new()
+	arena.half_nodes = [Vector3(-5.0, 0.0, 3.0)]
+	arena.center_nodes = [Vector3(-2.0, 0.0, 0.0), Vector3(0.0, 0.0, 0.0), Vector3(2.0, 0.0, 0.0)]
+	arena.line_nodes = [Vector3(-5.0, 0.0, 0.0), Vector3(5.0, 0.0, 0.0)]
+	arena.half_to_line = [[0, 0]]
+	var graph: Dictionary = arena.nav_graph()
+	arena.free()
+	var points: Array = graph["points"]
+	var linked := {}
+	for edge: Array in graph["edges"]:
+		linked[[points[edge[0]], points[edge[1]]]] = true
+	if not linked.has([Vector3(-5.0, 0.0, 3.0), Vector3(-5.0, 0.0, 0.0)]):
+		return "half node should link to its line node"
+	if not linked.has([Vector3(5.0, 0.0, -3.0), Vector3(5.0, 0.0, 0.0)]):
+		return "mirrored half node should link to the mirrored line node, edges %s" % [graph["edges"]]
+	return ""
+
+
+## 판마다 맵이 차례로 바뀌고 마지막 다음은 처음으로 돌아온다.
+func test_map_rotation_visits_every_map() -> String:
+	var names := Catalog.names()
+	var current: String = names[0]
+	var seen := [current]
+	for i in names.size():
+		current = Catalog.next(current)
+		seen.append(current)
+	if seen.slice(0, names.size()) != names or current != names[0]:
+		return "rotation should visit %s in order, got %s" % [names, seen]
+	if not names.has("outpost"):
+		return "outpost should be in the catalog"
 	return ""

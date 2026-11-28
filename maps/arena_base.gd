@@ -20,6 +20,10 @@ var half_edges: Array = []
 var center_nodes: Array = []
 ## 절반 지점과 가운데 지점의 연결. [half_nodes 번호, center_nodes 번호].
 var half_to_center: Array = []
+## 거점이 아닌 가운데 선(z = 0) 위의 지점. 180도 돌려도 목록 안의 다른 지점이 되도록 짝을 지어 넣는다
+## (예: 양쪽 가장자리 골목). 절반 지점과의 연결은 [half_nodes 번호, line_nodes 번호].
+var line_nodes: Array = []
+var half_to_line: Array = []
 
 
 ## 바깥 벽과 구조물을 만든다. size는 경기장의 [가로(x), 세로(z)] 크기.
@@ -97,6 +101,13 @@ func nav_graph() -> Dictionary:
 		edges.append([mirror_start + int(link[0]), half + (center_nodes.size() - 1 - center)])
 	for index in center_nodes.size() - 1:
 		edges.append([half + index, half + index + 1])
+	var line_start := points.size()
+	points.append_array(line_nodes)
+	for link: Array in half_to_line:
+		var line: int = link[1]
+		edges.append([link[0], line_start + line])
+		var mirrored := line_nodes.find(mirror(line_nodes[line]))
+		edges.append([mirror_start + int(link[0]), line_start + mirrored])
 	return {"points": points, "edges": edges}
 
 

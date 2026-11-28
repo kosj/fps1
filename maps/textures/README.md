@@ -26,3 +26,12 @@ Compound 맵:
 | yellow_plaster | https://polyhaven.com/a/yellow_plaster | 건물 벽 |
 | red_brick_03 | https://polyhaven.com/a/red_brick_03 | 담 |
 | concrete_slab_wall_02 | https://polyhaven.com/a/concrete_slab_wall_02 | Depot 콘크리트 벽(조립식 판) |
+
+Outpost 맵:
+
+| 파일 접두어 | 에셋 | 용도 |
+|---|---|---|
+| snow_02 | https://polyhaven.com/a/snow_02 | 바닥, 지붕과 담 위의 눈 |
+| castle_wall_slates | https://polyhaven.com/a/castle_wall_slates | 돌담, 경기장 벽 |
+| dark_planks | https://polyhaven.com/a/dark_planks | 통나무 막사, 장작더미 |
+| box_profile_metal_sheet | https://polyhaven.com/a/box_profile_metal_sheet | 빨간 철판 창고 |

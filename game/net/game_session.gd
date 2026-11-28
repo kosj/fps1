@@ -177,7 +177,7 @@ func _load_map(path: String) -> void:
 	_nav_points = _map.call("nav_points")
 	_navigator = null
 	if _map.has_method("nav_graph"):
-		_navigator = NavGraph.new(_map.call("nav_graph"))
+		_navigator = NavGraph.new(_map.call("nav_graph"), _map.get_world_3d())
 
 
 ## 경기 중에 맵을 바꾼다(판 사이의 맵 순환, 서버가 알려 준 맵). 같은 맵이면 아무것도 하지 않는다.
