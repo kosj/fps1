@@ -190,10 +190,6 @@ func eye_position() -> Vector3:
 	return global_position + Vector3.UP * _head.position.y
 
 
-func head_pitch() -> float:
-	return _head.rotation.x
-
-
 ## 시점을 돌린다(라디안). 마우스 입력과 반동이 함께 쓴다.
 func add_view_rotation(yaw: float, pitch: float) -> void:
 	rotate_y(yaw)

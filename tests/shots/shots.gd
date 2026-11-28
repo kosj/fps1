@@ -6,11 +6,11 @@ extends Node3D
 const PLAYER_SCENE := preload("res://game/player/player.tscn")
 const MAP_SCENE := preload("res://maps/depot/depot.tscn")
 const Armory := preload("res://game/weapons/armory.gd")
-## 찍을 무기: 주무기 네 가지와 권총(game/weapons/armory.gd 번호).
-var _weapons := [0, 1, 2, 3, 4]
 const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const SETTLE_FRAMES := 50
 
+## 찍을 무기: 주무기 네 가지와 권총(game/weapons/armory.gd 번호).
+var _weapons := [0, 1, 2, 3, 4]
 var _player: CharacterBody3D
 var _out := "build/shots"
 var _frame := 0
