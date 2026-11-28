@@ -185,12 +185,17 @@ jobs:
         run: |
           base="https://${GITHUB_REPOSITORY%/*}.github.io/${GITHUB_REPOSITORY#*/}"
           version=$(curl -s "$base/index.html" | grep -oE 'v/[0-9a-f]+' | head -1)
-          echo "live build: $version"
-          for f in index.wasm index.pck index.js; do
-            curl -s -o /dev/null -D "/tmp/$f.h" -H 'Accept-Encoding: gzip, deflate, br' \
-              -w "WEBSIZE $f http=%{http_code} sent=%{size_download} type=%{content_type}\n" \
-              "$base/$version/$f"
-            grep -i '^content-encoding' "/tmp/$f.h" || echo "WEBSIZE $f not compressed"
+          page=$(curl -s "$base/$version/index.html")
+          engine=$(echo "$page" | grep -oE 'engine/[0-9a-f]+' | head -1)
+          assets=$(echo "$page" | grep -oE 'assets/[0-9a-f]+\.pck' | head -1)
+          echo "live build: $version engine: ${engine:-none} assets: ${assets:-none}"
+          files="$version/index.pck"
+          if [ -n "$engine" ]; then files="$files $engine/index.wasm $engine/index.js $assets"
+          else files="$files $version/index.wasm $version/index.js"; fi
+          for f in $files; do
+            curl -s -o /dev/null -D /tmp/headers -H 'Accept-Encoding: gzip, deflate, br' \
+              -w "WEBSIZE $f http=%{http_code} sent=%{size_download} type=%{content_type}\n" "$base/$f"
+            grep -i '^content-encoding' /tmp/headers || echo "WEBSIZE $f not compressed"
           done
 
       - name: Export Windows
@@ -199,11 +204,16 @@ jobs:
           ~/godot/godot --headless --export-release "Windows Desktop" build/windows/fps1.exe
           test -s build/windows/fps1.exe
 
+      # 웹 빌드는 엔진, 에셋 팩, 본 팩으로 나눠 배치한다(README의 "웹 배포").
+      # 지금 배포된 사이트에서 해시가 같은 엔진·에셋 파일을 그대로 가져와 휴대폰의 브라우저 캐시를 살린다.
       - name: Export Web
         run: |
-          mkdir -p build/web
-          ~/godot/godot --headless --export-release "Web" build/web/index.html
-          test -s build/web/index.html
+          mkdir -p /tmp/previous
+          if git fetch -q --depth=1 origin gh-pages; then
+            git archive FETCH_HEAD | tar -x -C /tmp/previous
+          fi
+          GODOT="$HOME/godot/godot" tools/web/build_site.sh build/site "${GITHUB_SHA::7}" /tmp/previous
+          test -s "build/site/v/${GITHUB_SHA::7}/index.html"
 
       # main에 병합될 때마다 웹 빌드를 gh-pages 브랜치에 올린다. GitHub Pages가 이 브랜치를 서비스한다.
       # 빌드 파일로 저장소가 커지지 않도록 매번 커밋 하나로 덮어쓴다.
@@ -213,19 +223,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # 빌드마다 주소가 달라지도록 버전 폴더에 넣는다. 브라우저가 예전 파일을 캐시에서 꺼내 쓰지 못한다.
-          VERSION="${GITHUB_SHA::7}"
-          rm -rf /tmp/site && mkdir -p "/tmp/site/v/$VERSION"
-          cp -r build/web/. "/tmp/site/v/$VERSION/"
+          # 빌드마다 바뀌는 본 팩은 v/<커밋>/에, 엔진과 에셋 팩은 내용 해시 이름으로 들어 있다.
+          rm -rf /tmp/site && cp -r build/site /tmp/site
           cd /tmp/site
-          cat > index.html <<HTML
-          <!doctype html>
-          <meta charset="utf-8">
-          <meta http-equiv="cache-control" content="no-cache">
-          <title>FPS1</title>
-          <script>location.replace("v/$VERSION/index.html" + location.search)</script>
-          HTML
-          touch .nojekyll
           git init -q -b gh-pages
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -253,7 +253,7 @@ jobs:
         with:
           retention-days: 3
           name: fps1-web
-          path: build/web
+          path: build/site
 
       # 계정의 아티팩트 저장 용량이 차면 업로드만 실패하므로 빌드 결과와 분리한다.
       - uses: actions/upload-artifact@v4
