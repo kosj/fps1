@@ -7,6 +7,11 @@ extends "res://maps/arena_base.gd"
 ## - 진영과 건물 사이를 벽돌 담(z = ±15)이 가로막고, 담의 틈 세 곳(왼쪽 끝, 가운데, 오른쪽 끝)으로 넘어간다.
 ## - 한쪽 절반만 정의하고 180도 돌려 복사하므로 두 팀의 조건이 같다.
 
+## 하늘 사진(maps/sky/README.md)과 그 속의 해 자리(u, v), 조명 고도(도).
+const SKY := preload("res://maps/sky/compound_sky.jpg")
+const SKY_SUN := Vector2(0.6377, 0.4590)
+const SKY_ENERGY := 1.0
+const SUN_ELEVATION := 26.0
 const AMBIENCE := preload("res://game/audio/sfx/ambience_yard.ogg")
 const AMBIENCE_VOLUME_DB := -24.0
 const BOUNDARY_HEIGHT := 4.0
@@ -120,8 +125,10 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	# 해가 낮게 비스듬히 들어 그림자가 길다.
-	_sun.rotation_degrees = Vector3(-31.0, 118.0, 0.0)
+	# 해 질 녘 구름 하늘. 사진 속 해는 지평선 가까이 있지만 그림자가 너무 길지 않게 조명은 26도에서 비춘다.
+	var environment: Environment = ($WorldEnvironment as WorldEnvironment).environment
+	Dressing.use_sky(environment, SKY, SKY_SUN, SKY_ENERGY, _sun, SUN_ELEVATION)
+	Dressing.add_far_ground(self, "ground")
 	($Floor/Mesh as MeshInstance3D).material_override = Surfaces.material("ground")
 	build_arena(Vector2(48.0, 64.0), BOUNDARY_HEIGHT, BRICK)
 	add_box(ROOF[0], ROOF[1], "roof")

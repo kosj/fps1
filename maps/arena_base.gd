@@ -5,6 +5,7 @@ extends Node3D
 ## 맵 스크립트는 _init에서 아래 변수들을 채우고 _ready에서 build_arena를 부른다.
 
 const Surfaces := preload("res://game/world/surfaces.gd")
+const Dressing := preload("res://maps/dressing.gd")
 const CONTAINER_KINDS := ["container", "container_blue", "container_rust"]
 const CONTAINER := "container"
 
@@ -122,18 +123,13 @@ func add_box(center: Vector3, size: Vector3, kind: String) -> void:
 	body.add_child(visual)
 	body.add_child(collision)
 	add_child(body)
+	Dressing.add_contact_shadow(self, center, size)
 
 
 ## 경기장 밖 건물(보이기만 하고 충돌은 없다). 각 항목은 [중심, 크기].
 func add_buildings(items: Array, kind: String) -> void:
 	for item: Array in items:
-		var mesh := BoxMesh.new()
-		mesh.size = item[1]
-		mesh.material = Surfaces.material(kind)
-		var building := MeshInstance3D.new()
-		building.mesh = mesh
-		building.position = item[0]
-		add_child(building)
+		Dressing.add_building(self, item[0], item[1], kind)
 
 
 ## 반복 재생되는 배경음.
