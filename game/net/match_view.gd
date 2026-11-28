@@ -3,6 +3,8 @@ extends RefCounted
 ## 경기 진행(game_session.gd)과 분리해, 로컬 대전과 네트워크 클라이언트가 함께 쓴다.
 
 const ZoneMarker := preload("res://game/match/zone_marker.gd")
+const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
+const Protocol := preload("res://game/net/net_protocol.gd")
 const TEAM_NAMES := ["BLUE", "RED"]
 const ALLY_COLOR := Color(0.25, 0.45, 0.9)
 const ENEMY_COLOR := Color(0.85, 0.25, 0.2)
@@ -132,3 +134,30 @@ func show_scores(hud: Node, rows: Array, own_id: int, force: bool) -> void:
 
 func _name_of(id: int, is_bot: bool) -> String:
 	return "BOT %d" % (id % 100) if is_bot else "PLAYER %d" % (id % 1000)
+
+
+## 서버 스냅샷의 다른 참가자 줄로 아바타를 만들고, 움직이고, 떠난 사람은 지운다.
+## avatars는 id -> RemoteAvatar 사전이고 이 함수가 내용을 바꾼다.
+func update_avatars(parent: Node, avatars: Dictionary, tick: int, others: Array) -> void:
+	var seen := {}
+	for row: Array in others:
+		var id: int = row[0]
+		seen[id] = true
+		if not avatars.has(id):
+			var created := RemoteAvatar.new()
+			parent.add_child(created)
+			avatars[id] = created
+		var avatar: RemoteAvatar = avatars[id]
+		var flags: int = row[3]
+		var is_low := (flags & Protocol.FLAG_LOW) != 0
+		var is_alive := (flags & Protocol.FLAG_ALIVE) != 0
+		avatar.push(tick, row[1], row[2], is_low, is_alive)
+		avatar.set_color(relative_color(int(row[4])))
+		avatar.set_meta("team", int(row[4]))
+		avatar.set_weapon((flags >> Protocol.SLOT_SHIFT) & Protocol.SLOT_MASK)
+		if (flags & Protocol.FLAG_FIRED) != 0:
+			avatar.play_shot()
+	for id: int in avatars.keys():
+		if not seen.has(id):
+			avatars[id].queue_free()
+			avatars.erase(id)

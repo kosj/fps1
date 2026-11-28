@@ -37,6 +37,7 @@ const Connector := preload("res://game/net/connector.gd")
 const LaunchArgs := preload("res://game/core/launch_args.gd")
 const Catalog := preload("res://maps/catalog.gd")
 const Grenades := preload("res://game/combat/grenades.gd")
+const Armory := preload("res://game/weapons/armory.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -221,10 +222,7 @@ func _start_from_args() -> void:
 		if DisplayServer.get_name() != "headless":
 			_add_pause_menu()
 	elif _args.has("range"):
-		mode = Mode.RANGE
-		if _map.has_method("spawn_offline_targets"):
-			_map.call("spawn_offline_targets")
-		_local = _spawn_player(true, 0)
+		_start_range()
 	else:
 		mode = Mode.LOCAL_MATCH
 		if not _args.has("spectate"):
@@ -240,26 +238,34 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 		"join":
 			_start_client(str(options["address"]))
 		"range":
-			mode = Mode.RANGE
 			_load_map(RANGE_MAP)
-			if _map.has_method("spawn_offline_targets"):
-				_map.call("spawn_offline_targets")
-			_local = _spawn_player(true, 0)
+			_start_range()
 		_:
 			mode = Mode.LOCAL_MATCH
 			_change_map(str(options.get("map", "depot")))
 			_difficulty = str(options.get("difficulty", Settings.difficulty()))
 			_set_game_mode(str(options.get("mode", "tdm")))
 			_local = _add_participant(LOCAL_ID, "local")["player"]
+			Authority.choose_primary(_peers[LOCAL_ID], _saved_primary())
 			_add_bots(int(options.get("bots", 5)))
 	_apply_quality()
 	_add_pause_menu()
+
+
+## 사격 연습장: 혼자서 과녁을 쏜다. 고른 주무기를 들고 시작한다.
+func _start_range() -> void:
+	mode = Mode.RANGE
+	if _map.has_method("spawn_offline_targets"):
+		_map.call("spawn_offline_targets")
+	_local = _spawn_player(true, 0)
+	_local.set_primary(_saved_primary())
 
 
 func _add_pause_menu() -> void:
 	_pause = PauseMenu.new()
 	_pause.visible = false
 	_pause.local_player = local_player
+	_pause.choose_primary = choose_primary
 	_pause.menu_requested.connect(_return_to_menu)
 	add_child(_pause)
 
@@ -400,7 +406,7 @@ func _add_bots(count: int) -> void:
 		var bot := CombatBot.new(bot_seed, entry["player"].rotation.y)
 		# 봇은 소총, 기관단총, 산탄총을 든다(저격총은 봇의 조준 방식과 맞지 않아 뺀다).
 		# 팀이 번갈아 배정되므로 둘씩 같은 무기를 줘서 양 팀의 무기 구성을 맞춘다.
-		bot.weapon_slot = (index >> 1) % 3
+		Authority.choose_primary(entry, (index >> 1) % 3)
 		bot.navigator = _navigator
 		bot.set_difficulty(_difficulty)
 		entry["bot"] = bot
@@ -423,6 +429,8 @@ func _add_participant(id: int, kind: String) -> Dictionary:
 		"fired": false,
 		"since_damage": 999.0,
 		"protected": 0.0,
+		"swap_left": Authority.SWAP_TIME,
+		"primary": player.primary,
 		"kind": kind,
 		"player": player,
 		"team": team,
@@ -455,8 +463,9 @@ func _on_participant_fired(_kick: Vector2, id: int) -> void:
 	var entry: Dictionary = _peers[id]
 	entry["fired"] = true
 	entry["protected"] = 0.0
+	entry["swap_left"] = 0.0
 	if entry["avatar"] != null:
-		entry["avatar"].set_weapon(entry["player"].weapon.slot)
+		entry["avatar"].set_weapon(entry["player"].weapon.weapon_id())
 		entry["avatar"].play_shot()
 
 
@@ -510,6 +519,7 @@ func _tick_authority(delta: float) -> void:
 				_respawn(id, entry)
 		entry["since_damage"] = float(entry["since_damage"]) + delta
 		entry["protected"] = maxf(float(entry["protected"]) - delta, 0.0)
+		entry["swap_left"] = maxf(float(entry["swap_left"]) - delta, 0.0)
 		player.health = Vitals.regenerate(
 			player.health, Protocol.MAX_HEALTH, float(entry["since_damage"]), delta
 		)
@@ -615,9 +625,11 @@ func _respawn(id: int, entry: Dictionary) -> void:
 	player.alive = true
 	player.move_state = 0
 	player.crouching = false
+	player.set_primary(int(entry["primary"]))
 	player.weapon.reset()
 	player.grenades = Grenades.PER_LIFE
 	entry["protected"] = Vitals.SPAWN_PROTECTION
+	entry["swap_left"] = Authority.SWAP_TIME
 	entry["since_damage"] = 999.0
 	(entry["history"] as Array).clear()
 
@@ -634,7 +646,7 @@ func _send_snapshots() -> void:
 			player.health, player.alive, player.weapon.state.ammo, entry["kills"], entry["deaths"],
 			entry["team"], _team_scores[0], _team_scores[1], _time_left, _intermission_left > 0.0,
 			player.weapon.slot, _domination.state() if _domination != null else [],
-			player.grenades,
+			player.grenades, player.primary,
 		]
 		_rpc_snapshot.rpc_id(id, _tick, entry["last_seq"], player.capture_state(), status, others)
 
@@ -767,6 +779,7 @@ func _on_connected() -> void:
 	stats["connected"] = true
 	_local = _spawn_player(true, 0)
 	_local.weapon.resolve_shot = _client_resolve_shot
+	_rpc_loadout.rpc_id(1, _saved_primary())
 	print("connected as peer %d" % multiplayer.get_unique_id())
 
 
@@ -846,6 +859,31 @@ func _rpc_damaged(from: Vector3) -> void:
 		_local.show_damage_from(from)
 
 
+## 로드아웃 선택(일시 정지 화면). 바로 바뀌었으면 true, 다음 리스폰 때 바뀌면 false.
+## 서버에 접속 중이면 서버가 정하므로 false를 돌려주고, 바뀐 결과는 스냅샷으로 받는다.
+func choose_primary(id: int) -> bool:
+	Settings.write(Settings.PRIMARY, id)
+	if mode == Mode.CLIENT:
+		_rpc_loadout.rpc_id(1, id)
+	elif mode == Mode.RANGE and _local != null:
+		_local.set_primary(id)
+		return true
+	elif _peers.has(LOCAL_ID):
+		return Authority.choose_primary(_peers[LOCAL_ID], id)
+	return false
+
+
+func _saved_primary() -> int:
+	return int(_args.get("primary", Settings.read(Settings.PRIMARY, Armory.DEFAULT_PRIMARY)))
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_loadout(id: int) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if mode == Mode.SERVER and _peers.has(sender):
+		Authority.choose_primary(_peers[sender], id)
+
+
 @rpc("authority", "call_remote", "reliable")
 func _rpc_grenade(origin: Vector3, direction: Vector3) -> void:
 	_grenades.throw(0, origin, direction)
@@ -877,32 +915,15 @@ func _apply_snapshot(
 	_latest_tick = maxi(_latest_tick, tick)
 	_view.own_team = int(status[5])
 
-	var seen := {}
-	for row: Array in others:
-		var id: int = row[0]
-		seen[id] = true
-		if not _avatars.has(id):
-			var created := RemoteAvatar.new()
-			add_child(created)
-			_avatars[id] = created
-		var avatar: RemoteAvatar = _avatars[id]
-		var flags: int = row[3]
-		var is_low := (flags & Protocol.FLAG_LOW) != 0
-		var is_alive := (flags & Protocol.FLAG_ALIVE) != 0
-		avatar.push(tick, row[1], row[2], is_low, is_alive)
-		avatar.set_color(_view.relative_color(int(row[4])))
-		avatar.set_meta("team", int(row[4]))
-		avatar.set_weapon((flags >> Protocol.SLOT_SHIFT) & Protocol.SLOT_MASK)
-		if (flags & Protocol.FLAG_FIRED) != 0:
-			avatar.play_shot()
-	for id: int in _avatars.keys():
-		if not seen.has(id):
-			_avatars[id].queue_free()
-			_avatars.erase(id)
+	_view.update_avatars(self, _avatars, tick, others)
 
 	if _local == null:
 		return
-	_local.apply_net_status(float(status[0]), bool(status[1]), int(status[2]), int(status[10]))
+	# 새 버전을 올리는 몇 분 동안은 예전 서버가 주무기 칸 없이 보낼 수 있다.
+	var server_primary: int = status[13] if status.size() > 13 else _local.primary
+	_local.apply_net_status(
+		float(status[0]), bool(status[1]), int(status[2]), int(status[10]), server_primary
+	)
 	if _local.grenades != int(status[12]):
 		_local.grenades = int(status[12])
 	_view.show_match(
@@ -948,6 +969,8 @@ func _reconcile(last_seq: int, own: Array, delta: float) -> void:
 ## 통계를 출력하고, --expect 조건을 검사해 종료 코드로 결과를 알린다.
 func _finish() -> void:
 	_exit_after = 0.0
+	if _local != null:
+		stats["primary"] = _local.primary
 	if _remote_max_x > _remote_min_x:
 		stats["remote_travel"] = _remote_max_x - _remote_min_x
 	var role := "local"

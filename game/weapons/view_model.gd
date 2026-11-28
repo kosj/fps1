@@ -19,11 +19,9 @@ const EJECT_TIME := 0.09
 const EJECT_PORT := Vector3(0.03, 0.02, -0.08)
 ## 팔꿈치 위치(총 원점 기준). 손목에서 이쪽으로 팔이 뻗는다.
 const ELBOW_RIGHT := Vector3(0.14, -0.3, 0.5)
-const ELBOW_LEFT := Vector3(-0.3, -0.15, 0.2)
 ## 손목 축을 기준으로 손을 돌리는 각도(도). 오른손은 손잡이를 쥐게 세우고, 왼손은 손바닥이 위로.
 const ARM_TINT := Color(0.5, 0.52, 0.44)
 const ROLL_RIGHT := 90.0
-const ROLL_LEFT := 180.0
 
 var aim_blend := 0.0
 var sprint_target := 0.0
@@ -52,6 +50,7 @@ var _mag_rest := Vector3.ZERO
 var _action_rest := Vector3.ZERO
 var _action_kick := 0.0
 var _ads_position := ADS_POSITION
+var _hip_position := HIP_POSITION
 var _hide_when_aimed := false
 
 
@@ -85,7 +84,8 @@ func set_weapon(data: Resource) -> void:
 	if _muzzle_mesh != null:
 		_muzzle_mesh.position = muzzle_at
 		_muzzle_light.position = muzzle_at
-	_place_arms(data.get("grip_point"), data.get("support_point"))
+	_place_arms(data)
+	_hip_position = HIP_POSITION + (data.get("hip_offset") as Vector3)
 	_ads_position = Vector3(0.0, -float(data.get("sight_height")), -float(data.get("aim_distance")))
 	_hide_when_aimed = bool(data.get("hide_when_aimed"))
 
@@ -127,7 +127,7 @@ func _process(delta: float) -> void:
 	if _reload_left <= 0.0:
 		reload_curve = 0.0
 
-	var base := HIP_POSITION.lerp(_ads_position, smoothstep(0.0, 1.0, aim_blend))
+	var base := _hip_position.lerp(_ads_position, smoothstep(0.0, 1.0, aim_blend))
 	var spring_offset := _position_spring.update(Vector3.ZERO, delta)
 	position = base + bob + RELOAD_DROP * reload_curve + spring_offset
 
@@ -183,7 +183,7 @@ func muzzle_global() -> Vector3:
 	return _muzzle_mesh.global_position if _muzzle_mesh != null else global_position
 
 
-func _place_arms(grip: Vector3, support: Vector3) -> void:
+func _place_arms(data: Resource) -> void:
 	if _arm_right == null:
 		var arms := ARMS.instantiate() as Node3D
 		add_child(arms)
@@ -196,8 +196,8 @@ func _place_arms(grip: Vector3, support: Vector3) -> void:
 			var material := mesh.mesh.surface_get_material(0).duplicate() as StandardMaterial3D
 			material.albedo_color = ARM_TINT
 			mesh.set_surface_override_material(0, material)
-	_aim_arm(_arm_right, ELBOW_RIGHT, grip, ROLL_RIGHT)
-	_aim_arm(_arm_left, ELBOW_LEFT, support, ROLL_LEFT)
+	_aim_arm(_arm_right, ELBOW_RIGHT, data.get("grip_point"), ROLL_RIGHT)
+	_aim_arm(_arm_left, data.get("support_elbow"), data.get("support_point"), data.get("support_roll"))
 	_left_rest_y = _arm_left.position.y if _arm_left != null else 0.0
 
 

@@ -10,7 +10,8 @@ const RELOAD := 32
 const GRENADE := 64
 const ALL_BUTTONS := 127
 const PITCH_LIMIT := 1.55
-const MAX_WEAPON_SLOT := 3
+## 무기 칸: 0 주무기, 1 권총.
+const MAX_WEAPON_SLOT := 1
 
 var seq := 0
 ## x: 좌우, y: 전후(전진이 -1).

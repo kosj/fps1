@@ -1,0 +1,38 @@
+[gd_resource type="Resource" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://game/weapons/weapon_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://game/weapons/models/pistol_p9.glb" id="2_model"]
+[ext_resource type="AudioStream" path="res://game/audio/sfx/shot_pistol.ogg" id="3_shot"]
+
+[resource]
+script = ExtResource("1_data")
+model = ExtResource("2_model")
+shot_sound = ExtResource("3_shot")
+grip_point = Vector3(0, -0.13, 0.085)
+support_point = Vector3(-0.03, -0.15, 0.06)
+support_elbow = Vector3(-0.25, -0.25, 0.45)
+support_roll = 90.0
+hip_offset = Vector3(-0.04, 0.035, -0.06)
+sight_height = 0.0235
+aim_distance = 0.5
+hide_when_aimed = false
+display_name = "P-9"
+automatic = false
+damage = 30.0
+min_damage = 18.0
+headshot_multiplier = 1.5
+falloff_start = 10.0
+falloff_end = 28.0
+max_range = 120.0
+fire_interval = 0.14
+magazine_size = 12
+reload_time = 1.4
+ads_time = 0.12
+ads_fov = 62.0
+hip_spread_deg = 1.4
+ads_spread_deg = 0.35
+move_spread_deg = 0.5
+recoil_pattern = PackedVector2Array(0, 1.2, 0.15, 1.1, -0.2, 1.1, 0.25, 1.0, -0.1, 1.0, 0.2, 1.0, -0.25, 0.95, 0.1, 0.95)
+recoil_recovery = 12.0
+recoil_reset_time = 0.3
+ads_recoil_scale = 0.8

@@ -21,7 +21,8 @@ Windows와 웹에서 서비스하는 6v6 멀티플레이 1인칭 슈터입니다
 | 발사 / 정조준 | 마우스 왼쪽 / 오른쪽 |
 | 재장전 | R |
 | 수류탄 (목숨당 2개) | G |
-| 무기 교체 | 1 소총, 2 기관단총, 3 산탄총, 4 저격총 (마우스 휠로도 가능) |
+| 무기 교체 | 1 주무기, 2 권총 (마우스 휠로도 가능) |
+| 로드아웃 | 시작 화면이나 일시 정지 화면의 LOADOUT에서 주무기(소총, 기관단총, 산탄총, 저격총)를 고른다. 권총은 늘 함께 든다. 리스폰 직후 6초 안에 쏘기 전이면 바로, 아니면 다음 리스폰 때 바뀐다 |
 | 마우스 감도 | - 낮추기, = 높이기 (자동 저장) |
 | 마우스 잠금 | 화면 클릭 |
 | 마우스 해제 | Esc |
@@ -63,7 +64,7 @@ godot -- --connect=127.0.0.1:7777
 - 화면 왼쪽: 누른 자리에 가상 스틱이 생깁니다. 끝까지 앞으로 밀면 달립니다.
 - 화면 오른쪽: 끌어서 시선을 돌립니다. FIRE 버튼을 누른 채 끌어도 됩니다.
 - 조준 보조: 조준선이 보이는 적 근처에 가면 시선 이동이 느려지고 적 쪽으로 살짝 끌립니다.
-- 버튼: FIRE 발사, AIM 정조준(누를 때마다 전환), JUMP 점프와 난간 넘기, DUCK 앉기(달리는 중엔 슬라이딩), R 재장전, GUN 무기 교체, NADE 수류탄, 왼쪽 위 II 일시 정지
+- 버튼: FIRE 발사, AIM 정조준(누를 때마다 전환), JUMP 점프와 난간 넘기, DUCK 앉기(달리는 중엔 슬라이딩), R 재장전, GUN 주무기/권총 교체, NADE 수류탄, 왼쪽 위 II 일시 정지
 
 ## 테스트
 
@@ -122,7 +123,8 @@ docs/                 기술 결정 기록, 에셋 품질 기준
 
 | 에셋 | 만든 방법 | 다시 만들기 |
 |---|---|---|
-| 총기 4종 | Blender 스크립트 모델링 + 마모 텍스처 베이크 | `blender -b --python tools/asset_pipeline/build_weapons.py -- game/weapons/models` |
+| 총기 5종(주무기 4, 권총) | Blender 스크립트 모델링 + 마모 텍스처 베이크 | `blender -b --python tools/asset_pipeline/build_weapons.py -- game/weapons/models` |
+| 무기 아이콘 | 같은 스크립트의 직교 옆모습 렌더(배경 투명) | `... build_weapons.py -- <임시 폴더> --icons game/ui/icons` (잘라서 384x168로 줄인다) |
 | 엄폐물 | Blender 스크립트 모델링(맵에서 쓰는 크기별) | `blender -b --python tools/asset_pipeline/build_props.py -- maps/props` |
 | 병사 | Varco 3D: 이미지 → 3D → 리깅 → 소총 동작 8종 | `merge_character.py`로 동작별 GLB를 하나로 합침 |
 | 1인칭 팔 | Varco 손가락 리깅에서 손가락을 굽혀 잘라냄 | `extract_arms.py` |

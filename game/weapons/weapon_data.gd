@@ -23,6 +23,12 @@ extends Resource
 ## 1인칭 손 위치(총 원점 기준, m). 오른손은 손잡이, 왼손은 총열 덮개 아래를 받친다.
 @export var grip_point := Vector3(0.0, -0.1, 0.07)
 @export var support_point := Vector3(0.0, -0.085, -0.28)
+## 지향 사격 때 총 위치를 기본 자리에서 옮기는 양(m). 작은 권총은 위로, 가운데로 당긴다.
+@export var hip_offset := Vector3.ZERO
+## 왼팔 팔꿈치 자리와 왼손 비틀기(도). 소총은 손바닥을 위로 해 총열 덮개를 받치고(180),
+## 권총은 오른손을 옆에서 감싼다.
+@export var support_elbow := Vector3(-0.3, -0.15, 0.2)
+@export var support_roll := 180.0
 ## 조준경이 화면을 가리는 총은 정조준 중에 모델을 숨긴다.
 @export var hide_when_aimed := false
 

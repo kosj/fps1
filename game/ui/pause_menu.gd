@@ -7,12 +7,17 @@ signal menu_requested
 
 const MenuKit := preload("res://game/ui/menu_kit.gd")
 const Settings := preload("res://game/core/settings.gd")
+const Armory := preload("res://game/weapons/armory.gd")
+const LoadoutPanel := preload("res://game/ui/loadout_panel.gd")
 ## 계속하기를 누른 뒤 포인터 잠금이 됐는지 확인하기까지의 시간(초).
 const CAPTURE_CHECK_TIME := 0.4
 
 ## 지금의 내 플레이어를 돌려주는 함수(없으면 null). 세션이 넣어 준다.
 var local_player := Callable()
+## 주무기를 고르는 함수(번호 -> 바로 바뀌었는지). 세션이 넣어 준다.
+var choose_primary := Callable()
 var resume_button: Button
+var loadout_button: Button
 var menu_button: Button
 
 var _capture_check_left := 0.0
@@ -25,6 +30,9 @@ func _ready() -> void:
 	resume_button = MenuKit.button("RESUME")
 	resume_button.pressed.connect(resume)
 	column.add_child(resume_button)
+	loadout_button = MenuKit.button("LOADOUT")
+	loadout_button.pressed.connect(open_loadout)
+	column.add_child(loadout_button)
 	column.add_child(MenuKit.sensitivity_row(_on_sensitivity_changed))
 	column.add_child(MenuKit.ui_scale_row(get_tree()))
 	column.add_child(MenuKit.touch_toggle(_on_touch_toggled))
@@ -35,10 +43,28 @@ func _ready() -> void:
 	else:
 		column.add_child(MenuKit.label("WASD move    Shift sprint    Ctrl crouch / slide", 18))
 		column.add_child(MenuKit.label("Space jump / mantle    R reload    G grenade", 18))
-		column.add_child(MenuKit.label("LMB fire    RMB aim    1-4 or wheel: weapons", 18))
+		column.add_child(MenuKit.label("LMB fire    RMB aim    1 primary / 2 pistol (or wheel)", 18))
 	menu_button = MenuKit.button("MAIN MENU")
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
 	column.add_child(menu_button)
+
+
+## 로드아웃 화면을 연다. 막 태어났으면 바로, 아니면 다음 리스폰 때 바뀐다.
+func open_loadout() -> LoadoutPanel:
+	var panel := LoadoutPanel.new()
+	var player = _player()
+	panel.selected = player.primary if player != null else Armory.DEFAULT_PRIMARY
+	panel.chosen.connect(_on_primary_chosen)
+	add_child(panel)
+	return panel
+
+
+func _on_primary_chosen(id: int) -> void:
+	var now: bool = choose_primary.call(id) if choose_primary.is_valid() else false
+	var player = _player()
+	if player != null and player.hud != null:
+		var when := "" if now else "  (next spawn)"
+		player.hud.show_notice("LOADOUT: %s%s" % [Armory.title(id), when])
 
 
 func _process(delta: float) -> void:

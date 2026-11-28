@@ -5,7 +5,9 @@ extends Node3D
 
 const PLAYER_SCENE := preload("res://game/player/player.tscn")
 const MAP_SCENE := preload("res://maps/depot/depot.tscn")
-const WEAPONS := ["weapon_1", "weapon_2", "weapon_3", "weapon_4"]
+const Armory := preload("res://game/weapons/armory.gd")
+## 찍을 무기: 주무기 네 가지와 권총(game/weapons/armory.gd 번호).
+var _weapons := [0, 1, 2, 3, 4]
 const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const SETTLE_FRAMES := 50
 
@@ -19,6 +21,10 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
 			_out = arg.trim_prefix("--out=")
+		elif arg.begins_with("--weapons="):
+			# 일부 무기만 찍는다: --weapons=4 또는 --weapons=0,4
+			var listed := arg.trim_prefix("--weapons=").split(",")
+			_weapons = Array(listed).map(func(x: String) -> int: return int(x))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_out))
 	var map := MAP_SCENE.instantiate()
 	add_child(map)
@@ -62,17 +68,15 @@ func _process(_delta: float) -> void:
 	var aimed := _step % 2 == 1
 	if _step > 0:
 		_save("%d_%s" % [(_step - 1) / 2 + 1, "ads" if (_step - 1) % 2 == 1 else "hip"])
-	if weapon == WEAPONS.size() and not aimed:
+	if weapon == _weapons.size() and not aimed:
 		# 효과 확인용: 소총으로 쏘는 중의 화면. 화염은 한 프레임뿐이라 캡처용으로 길게 켠다.
 		Input.action_release("aim")
-		for action in WEAPONS:
-			Input.action_release(action)
-		Input.action_press(WEAPONS[0])
+		_equip(_weapons[0])
 		Input.action_press("fire")
 		get_tree().create_timer(0.6).timeout.connect(_hold_flash)
 		_step += 1
 		return
-	if weapon >= WEAPONS.size():
+	if weapon >= _weapons.size():
 		Input.action_release("fire")
 		get_tree().quit()
 		return
@@ -80,10 +84,19 @@ func _process(_delta: float) -> void:
 		Input.action_press("aim")
 	else:
 		Input.action_release("aim")
-		for action in WEAPONS:
-			Input.action_release(action)
-		Input.action_press(WEAPONS[weapon])
+		_equip(_weapons[weapon])
 	_step += 1
+
+
+## 무기를 든다: 주무기는 로드아웃을 바꾸고 1번, 권총은 2번.
+func _equip(id: int) -> void:
+	Input.action_release("weapon_1")
+	Input.action_release("weapon_2")
+	if Armory.is_primary(id):
+		_player.call("set_primary", id)
+		Input.action_press("weapon_1")
+	else:
+		Input.action_press("weapon_2")
 
 
 func _hold_flash() -> void:
