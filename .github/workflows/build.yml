@@ -198,6 +198,31 @@ jobs:
             grep -i '^content-encoding' /tmp/headers || echo "WEBSIZE $f not compressed"
           done
 
+      # 배포된 웹 빌드를 크롬의 휴대폰 에뮬레이션(844x390, 터치)으로 열어 봇전까지 들어가 본다.
+      - uses: actions/setup-node@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          node-version: 22
+
+      - name: Play the live web build in a phone browser
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: |
+          mkdir -p build/live
+          base="https://${GITHUB_REPOSITORY%/*}.github.io/${GITHUB_REPOSITORY#*/}/"
+          TAPS="252,129,70000" timeout 400 node tests/web/phone_check.mjs "$base" build/live/phone mobile \
+            2>&1 | tee live.log
+          grep -q "map: " live.log
+          ! grep -qE "EXCEPTION|asset pack .* is missing" live.log
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        with:
+          retention-days: 3
+          name: live-web-phone
+          path: build/live
+
       - name: Export Windows
         run: |
           mkdir -p build/windows
