@@ -17,6 +17,8 @@ var _banner_left := 0.0
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# hud가 점수판·사망·결과 화면을 띄우는 동안 이 알림을 숨긴다.
+	add_to_group(&"hud_popups")
 	# 조준선 바로 아래 가운데. 오른쪽은 휴대폰의 터치 버튼이 차지한다.
 	_awards = UiStyle.column(0)
 	_awards.set_anchors_preset(Control.PRESET_CENTER_TOP)
@@ -31,7 +33,8 @@ func _ready() -> void:
 	_banner = UiStyle.panel(UiStyle.margins(style, 22, 10))
 	_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	_banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_banner.position.y += 150.0
+	# 점수 막대(거점 표시 포함) 바로 아래: 조준선을 가리지 않게 화면 위쪽에 띄운다.
+	_banner.position.y += 112.0
 	_banner.modulate.a = 0.0
 	add_child(_banner)
 	_banner_column = UiStyle.column(0)

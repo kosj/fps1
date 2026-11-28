@@ -137,6 +137,8 @@ func _show_result() -> void:
 	_game.process_mode = Node.PROCESS_MODE_DISABLED
 	var view: Object = _game.get("_view")
 	var hud: Node = player.get("hud")
+	# 경기는 멈춰도 HUD는 실제처럼 돌아야 한다(결과가 뜨면 터치 버튼이 흐려진다).
+	hud.process_mode = Node.PROCESS_MODE_ALWAYS
 	view.call("show_match", hud, [0, 30, 24, 0.0, true, 14, 6, true])
 	var rows: Array = _game.call("score_rows") if _game.has_method("score_rows") else []
 	if rows.is_empty():
