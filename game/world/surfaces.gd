@@ -10,10 +10,10 @@ const KINDS := {
 	"floor": ["asphalt_02", 0.25, Color(0.85, 0.85, 0.88)],
 	# 조립식 콘크리트 판(실제 2.1m 크기의 사진이라 1m당 0.476번 반복).
 	"wall": ["concrete_slab_wall_02", 0.476, Color(0.78, 0.78, 0.8)],
-	"container": ["container_side", 0.4, Color(0.36, 0.62, 0.42), "container_grey"],
+	"container": ["container_side", 0.4, Color(0.26, 0.48, 0.32), "container_grey"],
 	"crate": ["plywood", 0.6, Color(0.95, 0.9, 0.8)],
-	"container_blue": ["container_side", 0.4, Color(0.25, 0.42, 0.75), "container_grey"],
-	"container_rust": ["container_side", 0.4, Color(0.72, 0.33, 0.2), "container_grey"],
+	"container_blue": ["container_side", 0.4, Color(0.2, 0.34, 0.62), "container_grey"],
+	"container_rust": ["container_side", 0.4, Color(0.62, 0.27, 0.16), "container_grey"],
 	"container_frame": ["container_side", 0.05, Color(0.42, 0.5, 0.45)],
 	"barrier": ["cracked_concrete_wall", 0.7, Color(0.5, 0.5, 0.5)],
 	"barrier_frame": ["cracked_concrete_wall", 0.7, Color(0.22, 0.22, 0.22)],
