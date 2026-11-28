@@ -28,6 +28,14 @@ Windows와 웹에서 서비스하는 6v6 멀티플레이 1인칭 슈터입니다
 | 성장 | 킬 100, 헤드샷 +50, 판 승리 500(무승부 300, 패배 200) 경험치. 레벨에 따라 주무기가 풀린다: 기관단총 2, 산탄총 3, 저격총 4. 기기마다 따로 저장된다 |
 | 이름 | 시작 화면 제목 옆 CALLSIGN 칸. 영문, 숫자, 공백, `_-.`만 16자까지. 온라인에서는 서버가 겹치지 않게 뒤에 숫자를 붙인다. 아군 머리 위에 이름이 보인다 |
 | 점수판 | Tab을 누르는 동안(터치는 왼쪽 위 TAB 버튼), 죽었을 때, 판이 끝났을 때. 봇은 이름 뒤에 [B] |
+
+| 맵 | 분위기 | 특징 |
+| --- | --- | --- |
+| Depot | 맑은 낮의 컨테이너 야적장 (60 x 80 m) | 넓고 엄폐물이 흩어져 있어 중거리 교전이 많다 |
+| Compound | 해 질 녘의 흙벽 주택 단지 (48 x 64 m) | 가운데 지붕 있는 건물(거점 B)을 두고 가까이 붙는다 |
+| Outpost | 안개 낀 겨울 아침의 산속 전초기지 (56 x 72 m) | 양옆 통나무 막사(거점 A, C), 가운데 광장(B), 막사 바깥 골목까지 세 갈래 길 |
+
+판이 끝나면 다음 맵으로 넘어간다(Depot → Compound → Outpost → Depot).
 | 소리 | 시작 화면 음악(시작 화면의 Music으로 끄고 켠다), 아나운서(경기 시작, 1분 남음, 승리/패배, 거점 확보/상실), 판 결과 음악 |
 | 마우스 감도 | - 낮추기, = 높이기 (자동 저장) |
 | 마우스 잠금 | 화면 클릭 |
@@ -118,7 +126,7 @@ game/                 core, movement, player, weapons, combat, match, bots, net,
 game/weapons/models/  총기와 1인칭 팔 GLB
 game/player/models/   병사 GLB (동작 8종 포함)
 game/audio/sfx/       효과음 OGG
-maps/                 맵 씬(depot, compound), maps/catalog.gd(맵 목록), maps/arena_base.gd(대칭 맵 공통),
+maps/                 맵 씬(depot, compound, outpost), maps/catalog.gd(맵 목록), maps/arena_base.gd(대칭 맵 공통),
                       maps/textures(재질), maps/props(엄폐물 GLB)
 tests/                단위 테스트, smoke, 네트워크 테스트, shots(화면 캡처)
 tools/asset_pipeline/ 에셋 제작 스크립트 (Blender)
@@ -135,7 +143,8 @@ docs/                 기술 결정 기록, 에셋 품질 기준
 | 병사 | Varco 3D: 이미지 → 3D → 리깅 → 소총 동작 8종 | `merge_character.py`로 동작별 GLB를 하나로 합침 |
 | 1인칭 팔 | Varco 손가락 리깅에서 손가락을 굽혀 잘라냄 | `extract_arms.py` |
 | 맵 재질 | Poly Haven CC0 (1K) | `maps/textures/README.md` |
-| 하늘 | Poly Haven CC0 HDRI를 톤매핑한 파노라마(사진 속 해에 조명 방향을 맞춤) | `maps/sky/README.md` |
+| 하늘 | Poly Haven CC0 HDRI를 톤매핑한 파노라마(사진 속 해에 조명 방향을 맞춤) | `python3 tools/asset_pipeline/make_sky.py` (`maps/sky/README.md`) |
+| 바람 소리(Outpost) | numpy로 합성한 이음매 없는 20초 반복 | `python3 tools/audio/compose_wind.py game/audio/sfx/ambience_wind.ogg` |
 | 효과음 | ElevenLabs 효과음 생성 후 잘라서 음량 맞춤 | `game/audio/sfx/README.md` |
 
 AI로 만든 메시를 넣기 전에는 `tools/asset_pipeline/analyze.py`로 삼각형 수·UV·파일 크기를 재고,
@@ -147,6 +156,7 @@ AI로 만든 메시를 넣기 전에는 `tools/asset_pipeline/analyze.py`로 삼
 로 무기별 지향/정조준 화면을 PNG로 저장할 수 있습니다.
 
 맵 그래픽 비교: `xvfb-run godot --rendering-driver opengl3 res://tests/shots/views.tscn -- --map=depot --out=/tmp/views`가 맵마다 같은 자리 다섯 곳(마지막은 하늘 속 해를 향함)을 찍습니다.
+맵의 트인 정도: `godot --headless --fixed-fps 60 res://tests/shots/sightlines.tscn -- --map=outpost`가 양 진영 앞 공간에서 서로 보이는 자리 쌍의 비율을 출력합니다(Depot 0.43, Compound 0.15, Outpost 0.23).
 
 ## 테스트
 

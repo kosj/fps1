@@ -5,6 +5,7 @@ extends RefCounted
 const MAPS := [
 	["depot", "Depot", "res://maps/depot/depot.tscn"],
 	["compound", "Compound", "res://maps/compound/compound.tscn"],
+	["outpost", "Outpost", "res://maps/outpost/outpost.tscn"],
 ]
 
 

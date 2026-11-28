@@ -92,6 +92,12 @@ jobs:
             -- --map=compound 2>&1 | tee map2.log
           ! grep -q "SCRIPT ERROR" map2.log
 
+      - name: Check the Outpost map
+        run: |
+          timeout 300 ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/map_check.tscn \
+            -- --map=outpost 2>&1 | tee map3.log
+          ! grep -q "SCRIPT ERROR" map3.log
+
       - name: Run menu smoke test
         run: |
           timeout 300 ~/godot/godot --headless --fixed-fps 60 res://tests/smoke/menu_smoke.tscn 2>&1 | tee menu.log
@@ -114,6 +120,13 @@ jobs:
           timeout 300 ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --mode=dom \
             --map=compound --exit-after=60 --expect-kills=3 --expect-zone-captures=2 2>&1 | tee dom2.log
           ! grep -q "SCRIPT ERROR" dom2.log
+
+      # 거점 A와 C가 막사 안에 있다: 봇이 문으로 드나들며 점령해야 한다.
+      - name: Run domination bot match on Outpost
+        run: |
+          timeout 300 ~/godot/godot --headless --fixed-fps 60 -- --spectate --bots=6 --mode=dom \
+            --map=outpost --exit-after=60 --expect-kills=3 --expect-zone-captures=2 2>&1 | tee dom3.log
+          ! grep -q "SCRIPT ERROR" dom3.log
 
       # 서버가 다른 맵을 돌리면 클라이언트가 따라 바꾸고, 클라이언트가 고른 로드아웃(저격총)을 서버가 받아 준다.
       - name: Client follows the server's map and gets its loadout

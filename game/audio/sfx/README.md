@@ -12,3 +12,4 @@ ElevenLabs 효과음 생성(eleven_text_to_sound_v2)으로 만들고, 앞뒤 무
 | ambience_yard | 야적장 배경음(바람, 먼 기계음). 1.4초 반복 |
 | explosion | 수류탄 폭발음. 1초짜리 원본에 잔향 꼬리를 더했다 |
 | shot_pistol | 권총 발사음. 원본(세 발 연속)에서 첫 발만 잘라 짧은 잔향을 더했다 |
+| ambience_wind | Outpost 바람 소리. ElevenLabs가 아니라 `tools/audio/compose_wind.py`로 합성한 20초 반복(돌풍과 휘파람 소리) |
