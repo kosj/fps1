@@ -36,6 +36,39 @@ static func tone(frequency: float, duration: float, decay: float) -> AudioStream
 	return _to_stream(samples)
 
 
+## 근접 공격의 휘두르는 소리: 높아졌다 낮아지는 잡음.
+static func whoosh() -> AudioStreamWAV:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	var count := int(MIX_RATE * 0.28)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var low := 0.0
+	var band := 0.0
+	for i in count:
+		var t := float(i) / count
+		# 필터가 열렸다 닫힌다: 바람을 가르는 소리.
+		var open := sin(PI * t)
+		var noise := rng.randf_range(-1.0, 1.0)
+		low = lerpf(low, noise, 0.05 + 0.35 * open)
+		band = lerpf(band, low, 0.5)
+		samples[i] = (low - band * 0.6) * open * open * 1.6
+	return _to_stream(samples)
+
+
+## 섬광탄을 맞은 뒤의 귀울림: 사인음 두 개가 살짝 어긋나 맥놀이를 만든다.
+## 먹먹해진 소리(저역 통과)를 지나도 들리도록 너무 높지 않게 둔다.
+static func ringing(duration: float) -> AudioStreamWAV:
+	var count := int(MIX_RATE * duration)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t := float(i) / MIX_RATE
+		var fade := minf(t * 30.0, 1.0) * pow(1.0 - float(i) / count, 1.6)
+		samples[i] = (sin(TAU * 1180.0 * t) + sin(TAU * 1186.0 * t)) * 0.22 * fade
+	return _to_stream(samples)
+
+
 ## 두 음이 이어지는 처치 확인음.
 static func kill_confirm() -> AudioStreamWAV:
 	var count := int(MIX_RATE * 0.22)

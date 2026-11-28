@@ -7,6 +7,8 @@ extends RefCounted
 ## - 회전 속도 제한: 시선이 순간 이동하지 않는다.
 ## - 조준 오차: 처음에는 크고, 계속 보고 있으면 줄어든다.
 
+## 이 거리(m) 안의 적은 근접 공격으로 친다.
+const MELEE_DISTANCE := 1.7
 const InputCmd := preload("res://game/player/input_cmd.gd")
 const AIM_HEIGHT := 1.0
 const WAYPOINT_RADIUS := 2.0
@@ -154,7 +156,11 @@ func _fight(cmd: InputCmd, delta: float, eye: Vector3, feet: Vector3, enemies: A
 	if _seen_time >= reaction_time and off_target <= fire_cone + _error.length():
 		cmd.buttons |= InputCmd.FIRE
 	if throws:
-		cmd.buttons |= InputCmd.GRENADE
+		# 셋 중 하나는 섬광탄(남아 있을 때만 실제로 던져진다).
+		cmd.buttons |= InputCmd.TACTICAL if _rng.randf() < 0.33 else InputCmd.GRENADE
+	if distance < MELEE_DISTANCE:
+		# 코앞의 적은 총보다 근접 공격이 빠르다.
+		cmd.buttons |= InputCmd.MELEE
 
 
 func _roam(cmd: InputCmd, delta: float, feet: Vector3, speed: float, nav_points: Array) -> void:

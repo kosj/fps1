@@ -8,7 +8,10 @@ const FIRE := 8
 const AIM := 16
 const RELOAD := 32
 const GRENADE := 64
-const ALL_BUTTONS := 127
+const MELEE := 128
+## 전술 장비(섬광탄).
+const TACTICAL := 256
+const ALL_BUTTONS := 511
 const PITCH_LIMIT := 1.55
 ## 무기 칸: 0 주무기, 1 권총.
 const MAX_WEAPON_SLOT := 1

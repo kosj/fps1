@@ -117,6 +117,27 @@ static func impact(parent: Node, point: Vector3, normal: Vector3) -> Node3D:
 	return root
 
 
+## 섬광탄: 아주 밝은 흰 빛과 흰 불티. 불꽃과 연기는 없다.
+static func flash_burst(parent: Node, point: Vector3) -> void:
+	if not parent.is_inside_tree():
+		return
+	var spark := _unshaded(Color(1.0, 1.0, 0.96, 1.0), false)
+	spark.albedo_texture = glow_texture()
+	spark.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	var at := point + Vector3.UP * 0.4
+	_blast_part(parent, at, _burst(spark, 4, 2.6, 0.5, 0.12, 0.96, Vector3.ZERO))
+	_blast_part(parent, at, _burst(spark, 18, 0.12, 9.0, 0.35, 0.96, Vector3(0, -6.0, 0)))
+	var light := OmniLight3D.new()
+	light.light_color = Color(1.0, 1.0, 0.95)
+	light.light_energy = 16.0
+	light.omni_range = 20.0
+	parent.add_child(light)
+	light.global_position = at
+	var fade := parent.create_tween()
+	fade.tween_property(light, "light_energy", 0.0, 0.35)
+	fade.tween_callback(light.queue_free)
+
+
 ## 수류탄 폭발: 번쩍이는 빛과 불꽃, 튀는 불티, 조금 뒤에 피어오르는 연기.
 static func explosion(parent: Node, point: Vector3) -> void:
 	if not parent.is_inside_tree():

@@ -9,6 +9,10 @@ const ADS_POSITION := Vector3(0.0, -0.085, -0.2)
 const SPRINT_ROTATION := Vector3(-0.2, 0.55, 0.1)
 const RELOAD_DROP := Vector3(0.02, -0.16, 0.04)
 const RELOAD_TILT := Vector3(0.5, 0.0, -0.35)
+## 근접 공격: 총을 왼쪽 앞으로 휘둘러 개머리판 쪽으로 친다.
+const MELEE_TIME := 0.38
+const MELEE_REACH := Vector3(-0.09, 0.03, -0.17)
+const MELEE_TWIST := Vector3(0.25, 0.85, 0.55)
 const MUZZLE_POSITION := Vector3(0.0, 0.0, -0.72)
 const FLASH_TIME := 0.045
 const MAG_DROP := Vector3(0.0, -0.22, 0.03)
@@ -33,6 +37,7 @@ var _rotation_spring := Spring.new(150.0, 15.0)
 var _sprint_blend := 0.0
 var _bob_time := 0.0
 var _reload_left := 0.0
+var _melee_left := 0.0
 var _reload_total := 1.0
 var _flash_left := 0.0
 var _muzzle_light: OmniLight3D
@@ -113,6 +118,10 @@ func play_reload(duration: float) -> void:
 	_reload_left = _reload_total
 
 
+func play_melee() -> void:
+	_melee_left = MELEE_TIME
+
+
 func _process(delta: float) -> void:
 	_sprint_blend = move_toward(_sprint_blend, sprint_target, delta * 6.0)
 	var hip_weight := 1.0 - aim_blend
@@ -127,13 +136,21 @@ func _process(delta: float) -> void:
 	if _reload_left <= 0.0:
 		reload_curve = 0.0
 
+	# 근접 공격: 빠르게 내지르고(앞 30%) 천천히 돌아온다.
+	_melee_left = maxf(_melee_left - delta, 0.0)
+	var swing := 1.0 - _melee_left / MELEE_TIME
+	var melee_curve := 0.0
+	if _melee_left > 0.0:
+		melee_curve = swing / 0.3 if swing < 0.3 else 1.0 - (swing - 0.3) / 0.7
+		melee_curve = smoothstep(0.0, 1.0, melee_curve)
+
 	var base := _hip_position.lerp(_ads_position, smoothstep(0.0, 1.0, aim_blend))
 	var spring_offset := _position_spring.update(Vector3.ZERO, delta)
-	position = base + bob + RELOAD_DROP * reload_curve + spring_offset
+	position = base + bob + RELOAD_DROP * reload_curve + MELEE_REACH * melee_curve + spring_offset
 
 	var sprint_pose := SPRINT_ROTATION * _sprint_blend * hip_weight
 	var spring_rotation := _rotation_spring.update(Vector3.ZERO, delta)
-	rotation = sprint_pose + RELOAD_TILT * reload_curve + spring_rotation
+	rotation = sprint_pose + RELOAD_TILT * reload_curve + MELEE_TWIST * melee_curve + spring_rotation
 
 	# 부품 움직임: 재장전 중간에 탄창이 빠졌다 들어오고, 쏠 때 노리쇠(펌프)가 뒤로 밀린다.
 	_action_kick = move_toward(_action_kick, 0.0, delta * 9.0)

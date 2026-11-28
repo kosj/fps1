@@ -11,6 +11,8 @@ const AIM := Vector2(1030.0, 645.0)
 const WEAPON := Vector2(1090.0, 420.0)
 const PAUSE := Vector2(60.0, 60.0)
 const SCORE := Vector2(140.0, 60.0)
+const FLASH := Vector2(850.0, 560.0)
+const MELEE := Vector2(975.0, 435.0)
 
 
 func test_left_side_drag_moves_and_sprints() -> String:
@@ -140,4 +142,19 @@ func test_score_button_holds_the_scoreboard_action() -> String:
 		return "holding TAB should press the scoreboard action"
 	if not released:
 		return "letting go of TAB should release the scoreboard action"
+	return ""
+
+
+func test_flash_and_melee_buttons_tap_their_bits() -> String:
+	var touch := TouchControls.new()
+	touch.handle_touch(4, FLASH, true)
+	touch.handle_touch(4, FLASH, false)
+	touch.handle_touch(5, MELEE, true)
+	touch.handle_touch(5, MELEE, false)
+	var bits := touch.buttons()
+	touch.free()
+	if (bits & InputCmd.TACTICAL) == 0:
+		return "tapping FLASH should throw a flashbang"
+	if (bits & InputCmd.MELEE) == 0:
+		return "tapping MELEE should swing"
 	return ""

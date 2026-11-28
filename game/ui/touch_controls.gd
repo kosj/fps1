@@ -4,7 +4,7 @@ extends Control
 ## - 화면 왼쪽을 누른 자리에 가상 스틱이 생긴다. 끝까지 앞으로 밀면 달린다.
 ## - 화면 오른쪽을 끌면 시선이 돈다. 발사 버튼을 누른 채 끌어도 시선이 돈다.
 ## - 버튼: 발사, 정조준(누를 때마다 켜고 끔), 점프, 앉기(누르는 동안), 재장전, 무기 교체, 수류탄, 일시 정지,
-##   점수판(누르는 동안 보인다. 키보드의 Tab과 같은 "scoreboard" 동작을 누른다).
+##   섬광탄, 근접 공격, 점수판(누르는 동안 보인다. 키보드의 Tab과 같은 "scoreboard" 동작을 누른다).
 ##
 ## 입력 해석은 handle_touch와 handle_drag에 모아 화면 없이도 테스트할 수 있게 했다.
 
@@ -73,6 +73,10 @@ func buttons() -> int:
 		bits |= InputCmd.RELOAD
 	if _tap_left.has("grenade"):
 		bits |= InputCmd.GRENADE
+	if _tap_left.has("tactical"):
+		bits |= InputCmd.TACTICAL
+	if _tap_left.has("melee"):
+		bits |= InputCmd.MELEE
 	if move.y < -SPRINT_THRESHOLD:
 		bits |= InputCmd.SPRINT
 	return bits
@@ -138,7 +142,7 @@ func _press(button: String) -> void:
 		"score":
 			_held[button] = true
 			Input.action_press("scoreboard")
-		"reload", "grenade":
+		"reload", "grenade", "tactical", "melee":
 			_tap_left[button] = TAP_HOLD_TIME
 		"jump", "crouch":
 			# 짧게 눌러도 한 틱 이상 입력으로 잡히게 잠시 유지한다.
@@ -163,6 +167,8 @@ func _layout() -> Dictionary:
 		"reload": [Vector2(area.x - 355.0, area.y - 65.0), 38.0, "R"],
 		"weapon": [Vector2(area.x - 190.0, area.y - 300.0), 38.0, "GUN"],
 		"grenade": [Vector2(area.x - 315.0, area.y - 170.0), 38.0, "NADE"],
+		"tactical": [Vector2(area.x - 430.0, area.y - 160.0), 34.0, "FLASH"],
+		"melee": [Vector2(area.x - 305.0, area.y - 285.0), 36.0, "MELEE"],
 		"pause": [Vector2(60.0, 60.0), 34.0, "II"],
 		"score": [Vector2(140.0, 60.0), 34.0, "TAB"],
 	}
