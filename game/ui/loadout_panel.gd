@@ -9,12 +9,14 @@ signal closed
 
 const Armory := preload("res://game/weapons/armory.gd")
 const MenuKit := preload("res://game/ui/menu_kit.gd")
+const Progression := preload("res://game/core/progression.gd")
 const STAT_NAMES := ["DAMAGE", "FIRE RATE", "RANGE", "HANDLING"]
 const CARD_COLOR := Color(0.1, 0.12, 0.15, 0.94)
 const PICKED_BORDER := Color(0.95, 0.72, 0.28)
 const IDLE_BORDER := Color(1.0, 1.0, 1.0, 0.12)
 const BAR_COLOR := Color(0.86, 0.88, 0.9)
 const DIM_TEXT := Color(0.72, 0.75, 0.8)
+const LOCK_TEXT := Color(1.0, 0.62, 0.3)
 ## 화면 폭이 이보다 좁으면(세로로 든 휴대폰) 카드를 두 줄로 놓는다.
 const WIDE_WIDTH := 1000.0
 
@@ -24,15 +26,18 @@ var back_button: Button
 
 var _styles := {}
 var _done := false
+var _level := 1
+var _hint: Label
 
 
 func _ready() -> void:
 	layer = 40
+	_level = Progression.saved_level()
 	var column := MenuKit.centered_column(self, Color(0.03, 0.04, 0.05, 0.97))
 	column.add_child(MenuKit.label("LOADOUT", 40))
-	var hint := MenuKit.label("Choose your primary weapon", 18)
-	hint.add_theme_color_override("font_color", DIM_TEXT)
-	column.add_child(hint)
+	_hint = MenuKit.label("Choose your primary weapon    (LEVEL %d)" % _level, 18)
+	_hint.add_theme_color_override("font_color", DIM_TEXT)
+	column.add_child(_hint)
 	var grid := GridContainer.new()
 	var wide := get_viewport().get_visible_rect().size.x >= WIDE_WIDTH
 	grid.columns = Armory.PRIMARIES.size() if wide else 2
@@ -58,6 +63,11 @@ func _unhandled_input(event: InputEvent) -> void:
 ## 주무기를 고르고 화면을 닫는다.
 func pick(id: int) -> void:
 	if _done:
+		return
+	if not Progression.is_unlocked(id, _level):
+		var needed := Progression.unlock_level(id)
+		_hint.text = "%s unlocks at level %d" % [Armory.title(id), needed]
+		_hint.add_theme_color_override("font_color", LOCK_TEXT)
 		return
 	selected = Armory.valid_primary(id)
 	_highlight()
@@ -96,7 +106,13 @@ func _card(id: int) -> Control:
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(icon)
 	box.add_child(_text(Armory.title(id), 22, Color.WHITE))
-	box.add_child(_text(Armory.ROLES[id], 14, DIM_TEXT))
+	if Progression.is_unlocked(id, _level):
+		box.add_child(_text(Armory.ROLES[id], 14, DIM_TEXT))
+	else:
+		# 잠긴 총: 흐리게 보이고, 역할 대신 풀리는 레벨을 쓴다.
+		box.modulate = Color(1.0, 1.0, 1.0, 0.45)
+		var needed := "LOCKED  -  LEVEL %d" % Progression.unlock_level(id)
+		box.add_child(_text(needed, 14, LOCK_TEXT))
 	var values: Array = Armory.stats(id)
 	for index in STAT_NAMES.size():
 		var row := HBoxContainer.new()

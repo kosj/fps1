@@ -5,6 +5,7 @@ extends RefCounted
 const ZoneMarker := preload("res://game/match/zone_marker.gd")
 const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const Protocol := preload("res://game/net/net_protocol.gd")
+const XpTracker := preload("res://game/match/xp_tracker.gd")
 const TEAM_NAMES := ["BLUE", "RED"]
 const ALLY_COLOR := Color(0.25, 0.45, 0.9)
 const ENEMY_COLOR := Color(0.85, 0.25, 0.2)
@@ -12,6 +13,8 @@ const NEUTRAL_COLOR := Color(0.75, 0.75, 0.75)
 
 ## 화면 주인의 팀. 색은 항상 이 팀을 기준으로 아군은 파랑, 적군은 빨강이다.
 var own_team := 0
+## 화면 주인의 경험치. 사람이 하는 경기에서만 있다(테스트 봇, 연습장, 서버는 null).
+var xp: XpTracker
 
 var _markers: Array = []
 
@@ -66,6 +69,8 @@ func show_zones(parent: Node, hud, zones: Array, states: Array) -> void:
 func show_kill(
 	hud, killer: int, victim: int, killer_team: int, headshot: bool, own_id: int
 ) -> void:
+	if xp != null and killer == own_id and victim != own_id:
+		xp.on_kill(headshot)
 	if hud == null:
 		return
 	var text := "%s  >  %s" % [name_of(killer, own_id), name_of(victim, own_id)]
@@ -97,9 +102,11 @@ func show_match(hud, status: Array) -> void:
 			]
 		)
 	var message := ""
+	var own := score_a if team == 0 else score_b
+	var other := score_b if team == 0 else score_a
+	if xp != null:
+		xp.on_match_state(bool(status[4]), own, other)
 	if bool(status[4]):
-		var own := score_a if team == 0 else score_b
-		var other := score_b if team == 0 else score_a
 		var title := "DRAW"
 		var color := Color(0.9, 0.9, 0.9)
 		if own > other:
@@ -112,6 +119,8 @@ func show_match(hud, status: Array) -> void:
 		var detail := "%s %d  -  %d %s    Next match starting soon" % [
 			TEAM_NAMES[0], score_a, score_b, TEAM_NAMES[1],
 		]
+		if xp != null:
+			detail += "\n" + xp.summary()
 		hud.set_result(title, color, detail)
 	else:
 		hud.set_result("", Color.WHITE, "")

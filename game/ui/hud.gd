@@ -86,7 +86,9 @@ func _ready() -> void:
 	_hint_label = _make_label(root, 22, Control.PRESET_CENTER)
 	_hint_label.offset_top = -120
 	_hint_label.offset_bottom = -90
-	_hint_label.text = "Click to play | WASD  Shift  Ctrl  Space  1-4 weapons  -/= sensitivity"
+	_hint_label.text = (
+		"Click to play | WASD  Shift  Ctrl  Space  1-2 weapons  G grenade  -/= sensitivity"
+	)
 
 
 func set_ammo(ammo: int, magazine_size: int) -> void:

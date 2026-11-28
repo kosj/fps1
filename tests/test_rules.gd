@@ -7,6 +7,8 @@ const Grenades := preload("res://game/combat/grenades.gd")
 const InputCmd := preload("res://game/player/input_cmd.gd")
 const Armory := preload("res://game/weapons/armory.gd")
 const Authority := preload("res://game/net/authority.gd")
+const Progression := preload("res://game/core/progression.gd")
+const XpTracker := preload("res://game/match/xp_tracker.gd")
 const EYE := Vector3(0.0, 1.6, 0.0)
 
 
@@ -151,3 +153,59 @@ class FakePlayer:
 
 	func set_primary(id: int) -> void:
 		primary = id
+
+
+func test_levels_follow_the_xp_curve() -> String:
+	if Progression.level_for(0) != 1 or Progression.level_start(1) != 0:
+		return "a new player should be level 1"
+	if Progression.level_for(Progression.FIRST_SPAN - 1) != 1:
+		return "levelled up before reaching the first threshold"
+	if Progression.level_for(Progression.FIRST_SPAN) != 2:
+		return "did not reach level 2 at %d xp" % Progression.FIRST_SPAN
+	var previous_span := 0
+	for level in range(1, Progression.MAX_LEVEL):
+		var span := Progression.level_start(level + 1) - Progression.level_start(level)
+		if span <= previous_span:
+			return "level %d is not harder than the one before" % level
+		previous_span = span
+		if Progression.level_for(Progression.level_start(level)) != level:
+			return "level_for disagrees with level_start at %d" % level
+	if Progression.level_for(10000000) != Progression.MAX_LEVEL:
+		return "level is not capped"
+	var progress := Progression.progress_in_level(Progression.level_start(3) + 50)
+	if progress != [50, 1200]:
+		return "progress in level 3 is %s" % [progress]
+	return ""
+
+
+func test_weapons_unlock_by_level() -> String:
+	if not Progression.is_unlocked(Armory.DEFAULT_PRIMARY, 1):
+		return "the default rifle must be usable at level 1"
+	if not Progression.is_unlocked(Armory.SIDEARM, 1):
+		return "the pistol must be usable at level 1"
+	for weapon_id: int in Progression.UNLOCKS:
+		var level := Progression.unlock_level(weapon_id)
+		if Progression.is_unlocked(weapon_id, level - 1) or not Progression.is_unlocked(weapon_id, level):
+			return "weapon %d does not unlock exactly at level %d" % [weapon_id, level]
+		if not Progression.unlocked_at(level).has(weapon_id):
+			return "unlocked_at(%d) misses weapon %d" % [level, weapon_id]
+	return ""
+
+
+func test_xp_tracker_awards_kills_and_one_match_result() -> String:
+	var tracker := XpTracker.new(null, false)
+	tracker.on_kill(false)
+	tracker.on_kill(true)
+	var kills := Progression.KILL_XP * 2 + Progression.HEADSHOT_XP
+	if tracker.earned != kills:
+		return "two kills (one headshot) gave %d xp" % tracker.earned
+	# 판이 끝난 동안 상태가 여러 번 와도 결과 경험치는 한 번만 준다.
+	for _repeat in 3:
+		tracker.on_match_state(true, 30, 12)
+	if tracker.earned != kills + Progression.WIN_XP:
+		return "a won match gave %d xp in total" % tracker.earned
+	tracker.on_match_state(false, 0, 0)
+	tracker.on_match_state(true, 5, 30)
+	if tracker.earned_this_match != Progression.LOSS_XP:
+		return "the next lost match counted %d xp" % tracker.earned_this_match
+	return ""
