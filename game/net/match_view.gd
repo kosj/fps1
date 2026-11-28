@@ -15,8 +15,12 @@ const NEUTRAL_COLOR := Color(0.75, 0.75, 0.75)
 var own_team := 0
 ## 화면 주인의 경험치. 사람이 하는 경기에서만 있다(테스트 봇, 연습장, 서버는 null).
 var xp: XpTracker
+## 참가자 이름(id -> 이름). 점수판 줄에서 배운다.
+var names := {}
 
 var _markers: Array = []
+## 나를 마지막으로 죽인 사람. 리스폰을 기다리는 동안 보여 준다.
+var _killed_by := ""
 
 
 func relative_color(team: int) -> Color:
@@ -25,12 +29,22 @@ func relative_color(team: int) -> Color:
 	return ALLY_COLOR if team == own_team else ENEMY_COLOR
 
 
-static func name_of(id: int, own_id: int) -> String:
+## 킬 알림에 쓰는 이름. 나는 YOU, 모르는 사람은 번호.
+func name_of(id: int, own_id: int) -> String:
 	if id == own_id:
 		return "YOU"
+	if names.has(id):
+		return str(names[id])
 	if id >= 1000:
 		return "BOT-%d" % (id - 999)
 	return "P-%d" % (id % 1000)
+
+
+## 점수판 줄([id, 팀, 킬, 데스, 봇 여부, 이름])에서 이름을 배운다.
+func learn_names(rows: Array) -> void:
+	for row: Array in rows:
+		if row.size() > 5:
+			names[int(row[0])] = str(row[5])
 
 
 ## 거점 표시와 HUD를 갱신한다. zones는 맵의 거점 목록([이름, 중심]),
@@ -71,6 +85,8 @@ func show_kill(
 ) -> void:
 	if xp != null and killer == own_id and victim != own_id:
 		xp.on_kill(headshot)
+	if victim == own_id:
+		_killed_by = "" if killer == own_id else name_of(killer, own_id)
 	if hud == null:
 		return
 	var text := "%s  >  %s" % [name_of(killer, own_id), name_of(victim, own_id)]
@@ -126,23 +142,25 @@ func show_match(hud, status: Array) -> void:
 		hud.set_result("", Color.WHITE, "")
 		if not bool(status[7]):
 			message = "RESPAWNING"
+			if _killed_by != "":
+				message = "KILLED BY %s     RESPAWNING" % _killed_by
 	hud.set_message(message)
 
 
-## 점수판. rows는 [id, 팀, 킬, 데스, 봇 여부]. 죽었거나 판이 끝났을 때(force), 또는 Tab을 누르는 동안 보인다.
+## 점수판. rows는 [id, 팀, 킬, 데스, 봇 여부, 이름]. 죽었거나 판이 끝났을 때(force), 또는 Tab을 누르는 동안 보인다.
+## 봇은 이름 뒤에 [B]를 붙인다.
 func show_scores(hud: Node, rows: Array, own_id: int, force: bool) -> void:
+	learn_names(rows)
 	var shown := force or Input.is_action_pressed("scoreboard")
 	var lines: Array = []
 	if shown:
 		for row: Array in rows:
 			var id := int(row[0])
-			var player_name := "YOU" if id == own_id else _name_of(id, bool(row[4]))
+			var player_name := str(names.get(id, name_of(id, -1)))
+			if bool(row[4]):
+				player_name += " [B]"
 			lines.append([int(row[1]), player_name, int(row[2]), int(row[3]), id == own_id])
 	hud.set_scoreboard(shown, lines, own_team)
-
-
-func _name_of(id: int, is_bot: bool) -> String:
-	return "BOT %d" % (id % 100) if is_bot else "PLAYER %d" % (id % 1000)
 
 
 ## 서버 스냅샷의 다른 참가자 줄로 아바타를 만들고, 움직이고, 떠난 사람은 지운다.
@@ -163,6 +181,7 @@ func update_avatars(parent: Node, avatars: Dictionary, tick: int, others: Array)
 		avatar.push(tick, row[1], row[2], is_low, is_alive)
 		avatar.set_color(relative_color(int(row[4])))
 		avatar.set_meta("team", int(row[4]))
+		avatar.set_tag(str(names.get(id, "")), int(row[4]) == own_team)
 		avatar.set_weapon((flags >> Protocol.SLOT_SHIFT) & Protocol.SLOT_MASK)
 		if (flags & Protocol.FLAG_FIRED) != 0:
 			avatar.play_shot()
