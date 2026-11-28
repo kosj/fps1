@@ -17,6 +17,7 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 
 [autoload]
 
+AssetPack="*res://game/core/asset_pack.gd"
 InputSetup="*res://game/core/input_setup.gd"
 
 [display]

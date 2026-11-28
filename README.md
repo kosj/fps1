@@ -115,9 +115,25 @@ GODOT=godot tests/net/run_net_test.sh prediction
 
 ### 웹 배포
 
-`main`에 병합될 때마다 웹 빌드가 `gh-pages` 브랜치에 올라갑니다.
-저장소 Settings → Pages에서 Source를 "Deploy from a branch", 브랜치를 `gh-pages`로 지정하면 GitHub Pages 주소로 서비스됩니다.
-게임 서버가 아직 배포되지 않았으므로 웹에서는 봇 대전만 됩니다. 대전을 하려면 `?connect=wss://서버주소`가 가리킬 TLS 게임 서버가 필요합니다.
+`main`에 병합될 때마다 웹 빌드가 `gh-pages` 브랜치에 올라가 GitHub Pages로 서비스됩니다
+(저장소 Settings → Pages에서 Source를 "Deploy from a branch", 브랜치를 `gh-pages`로 지정).
+공개 게임 서버는 `wss://fps1-server.onrender.com`이고 메뉴의 PLAY ONLINE이 기본으로 이곳에 접속합니다.
+
+휴대폰이 새 빌드마다 다시 받는 양을 줄이려고 웹 빌드는 세 덩어리로 나뉩니다(`tools/web/build_site.sh`).
+
+| 덩어리 | 크기(전송) | 다시 받는 때 |
+| --- | --- | --- |
+| 엔진 `engine/<해시>/index.wasm` | 약 10 MB(gzip) | Godot 버전을 바꿀 때 |
+| 에셋 팩 `assets/<해시>.pck`: game/·maps/의 텍스처, 모델, 소리 | 약 26 MB | 에셋이나 가져오기 설정이 바뀔 때 |
+| 본 팩 `v/<커밋>/index.pck`: 코드와 장면 | 약 0.3 MB | 빌드마다 |
+
+- 에셋 팩은 Web 프리셋에서 뺀 파일들을 `tools/web/make_asset_pack.gd`가 따로 묶은 것이고,
+  게임이 켜질 때 가장 먼저 `game/core/asset_pack.gd`(자동 로드 맨 앞)가 끼워 넣습니다.
+- 엔진과 에셋 팩은 내용 해시로 이름을 붙이고, 바뀌지 않았으면 이전 배포의 파일을 그대로 다시 올려
+  브라우저 캐시가 유지됩니다. 데스크톱과 서버 빌드는 전처럼 한 팩입니다.
+- 로컬에서 웹 빌드를 확인할 때도 `tools/web/build_site.sh`로 만든 사이트 폴더를 띄워야 합니다
+  (Web 프리셋만으로 내보낸 index.html에는 에셋이 없습니다).
+- 텍스처는 Basis Universal에 RDO(`compress/rdo_quality_loss=4.0`, 노멀 맵 제외)를 켜서 전송량을 줄였습니다.
 
 ## 폴더 구조
 
@@ -129,7 +145,8 @@ game/audio/sfx/       효과음 OGG
 maps/                 맵 씬(depot, compound, outpost), maps/catalog.gd(맵 목록), maps/arena_base.gd(대칭 맵 공통),
                       maps/textures(재질), maps/props(엄폐물 GLB)
 tests/                단위 테스트, smoke, 네트워크 테스트, shots(화면 캡처)
-tools/asset_pipeline/ 에셋 제작 스크립트 (Blender)
+tools/asset_pipeline/ 에셋 제작 스크립트 (Blender, 하늘)
+tools/web/            웹 빌드를 엔진·에셋·본 팩으로 나눠 배치
 docs/                 기술 결정 기록, 에셋 품질 기준
 ```
 
@@ -157,59 +174,6 @@ AI로 만든 메시를 넣기 전에는 `tools/asset_pipeline/analyze.py`로 삼
 
 맵 그래픽 비교: `xvfb-run godot --rendering-driver opengl3 res://tests/shots/views.tscn -- --map=depot --out=/tmp/views`가 맵마다 같은 자리 다섯 곳(마지막은 하늘 속 해를 향함)을 찍습니다.
 맵의 트인 정도: `godot --headless --fixed-fps 60 res://tests/shots/sightlines.tscn -- --map=outpost`가 양 진영 앞 공간에서 서로 보이는 자리 쌍의 비율을 출력합니다(Depot 0.43, Compound 0.15, Outpost 0.23).
-
-## 테스트
-
-```
-godot --headless --import
-godot --headless --script res://tests/run_tests.gd
-godot --headless --fixed-fps 60 res://tests/smoke/smoke.tscn
-GODOT=godot tests/net/run_net_test.sh lagcomp
-GODOT=godot tests/net/run_net_test.sh nolagcomp
-GODOT=godot tests/net/run_net_test.sh prediction
-```
-
-- 단위 테스트: 이동, 무기, 판정, 입력 검증 같은 순수 계산
-- 통합 테스트(smoke): 실제 플레이어 씬으로 걷기, 사격, 재장전, 슬라이딩, 난간 넘기
-- 봇 대전 테스트: `godot --headless --fixed-fps 60 -- --spectate --bots=6 --exit-after=60 --expect-kills=3`
-  - 균형 측정: `--seed=<n>`으로 봇 난수를 바꿔 여러 판의 `match over: a - b` 출력을 집계
-- 네트워크 테스트: 서버와 봇 클라이언트를 실제 프로세스로 띄워 지연을 넣고 확인
-  - `lagcomp`: 양방향 50ms 지연에서 좌우로 움직이는 상대를 맞히는지
-  - `nolagcomp`: 지연 보상을 끄면 같은 조건에서 거의 못 맞히는지(테스트 자체의 검증)
-  - `prediction`: 80ms 지연에서 달리기, 슬라이딩, 점프의 예측이 서버 결과와 일치하는지
-
-## 빌드
-
-`main` 브랜치에 푸시하거나 PR을 열면 GitHub Actions가 린트, 단위 테스트, 내보내기를 수행합니다.
-결과물은 Actions 실행 페이지의 Artifacts에서 받습니다.
-
-| 프리셋 | 렌더러 | 산출물 |
-| --- | --- | --- |
-| Windows Desktop | Forward+ | `fps1-windows` |
-| Web | Compatibility (WebGL 2) | `fps1-web` |
-| Linux Server | 헤드리스 | `fps1-linux-server` |
-
-웹 빌드는 HTTPS 또는 localhost에서 열어야 합니다.
-
-### 웹 배포
-
-`main`에 병합될 때마다 웹 빌드가 `gh-pages` 브랜치에 올라갑니다.
-저장소 Settings → Pages에서 Source를 "Deploy from a branch", 브랜치를 `gh-pages`로 지정하면 GitHub Pages 주소로 서비스됩니다.
-게임 서버가 아직 배포되지 않았으므로 웹에서는 봇 대전만 됩니다. 대전을 하려면 `?connect=wss://서버주소`가 가리킬 TLS 게임 서버가 필요합니다.
-
-## 폴더 구조
-
-```
-game/             core, movement, player, weapons, combat, ui, audio, net, bots
-maps/             맵 씬
-art/              Blender에서 내보낸 GLB, 머티리얼
-audio/            후처리를 마친 사운드
-tests/            헤드리스 단위 테스트
-tools/blender/    정리, 내보내기 자동화 스크립트
-tools/audio/      ElevenLabs 프롬프트 매니페스트, 후처리 스크립트
-server/           전용 서버 배포 설정
-docs/             기술 결정 기록, 아트 바이블
-```
 
 ## 코드 규칙
 

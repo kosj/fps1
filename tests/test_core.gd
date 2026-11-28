@@ -4,6 +4,7 @@ const Spring := preload("res://game/core/spring.gd")
 const Recoil := preload("res://game/weapons/recoil.gd")
 const Settings := preload("res://game/core/settings.gd")
 const Dressing := preload("res://maps/dressing.gd")
+const AssetPack := preload("res://game/core/asset_pack.gd")
 
 
 func test_spring_returns_to_target() -> String:
@@ -84,4 +85,24 @@ func test_contact_shadow_only_for_grounded_boxes() -> String:
 	parent.free()
 	if count != 1:
 		return "expected one shadow for the grounded box, got %d" % count
+	return ""
+
+
+## 웹 에셋 팩의 UID 목록: 모르는 UID만 등록하고, 이미 아는 것과 잘못된 줄은 건너뛴다.
+func test_asset_pack_registers_unknown_uids() -> String:
+	var known := ResourceUID.create_id()
+	ResourceUID.add_id(known, "res://already.png")
+	var fresh := ResourceUID.create_id()
+	var text := "%s res://fresh.png\n%s res://other.png\nnot-a-line\n" % [
+		ResourceUID.id_to_text(fresh), ResourceUID.id_to_text(known)
+	]
+	var added := AssetPack.register_uids(text)
+	var path := ResourceUID.get_id_path(fresh) if ResourceUID.has_id(fresh) else ""
+	var kept := ResourceUID.get_id_path(known)
+	ResourceUID.remove_id(fresh)
+	ResourceUID.remove_id(known)
+	if added != 1 or path != "res://fresh.png":
+		return "expected only the unknown uid to be added, added %d path %s" % [added, path]
+	if kept != "res://already.png":
+		return "a known uid must keep its path, got %s" % kept
 	return ""
