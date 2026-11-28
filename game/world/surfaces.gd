@@ -8,7 +8,8 @@ const TEXTURE_DIR := "res://maps/textures/"
 ## 컨테이너는 회색으로 바꾼 색 텍스처에 색조를 곱해 여러 색을 낸다.
 const KINDS := {
 	"floor": ["asphalt_02", 0.25, Color(0.85, 0.85, 0.88)],
-	"wall": ["cracked_concrete_wall", 0.55, Color(0.5, 0.5, 0.52)],
+	# 조립식 콘크리트 판(실제 2.1m 크기의 사진이라 1m당 0.476번 반복).
+	"wall": ["concrete_slab_wall_02", 0.476, Color(0.78, 0.78, 0.8)],
 	"container": ["container_side", 0.4, Color(0.36, 0.62, 0.42), "container_grey"],
 	"crate": ["plywood", 0.6, Color(0.95, 0.9, 0.8)],
 	"container_blue": ["container_side", 0.4, Color(0.25, 0.42, 0.75), "container_grey"],

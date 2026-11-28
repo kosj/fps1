@@ -25,3 +25,4 @@ Compound 맵:
 | dry_ground_01 | https://polyhaven.com/a/dry_ground_01 | 바닥(마른 흙) |
 | yellow_plaster | https://polyhaven.com/a/yellow_plaster | 건물 벽 |
 | red_brick_03 | https://polyhaven.com/a/red_brick_03 | 담 |
+| concrete_slab_wall_02 | https://polyhaven.com/a/concrete_slab_wall_02 | Depot 콘크리트 벽(조립식 판) |

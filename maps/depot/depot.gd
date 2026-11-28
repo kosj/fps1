@@ -9,6 +9,10 @@ extends "res://maps/arena_base.gd"
 ##   tests/smoke/map_check가 모든 연결이 실제로 막혀 있지 않은지 검사한다.
 
 const WALL_HEIGHT := 4.0
+## 하늘 사진(maps/sky/README.md)과 그 속의 해 자리(u, v).
+const SKY := preload("res://maps/sky/depot_sky.jpg")
+const SKY_SUN := Vector2(0.5947, 0.2334)
+const SKY_ENERGY := 1.0
 const AMBIENCE := preload("res://game/audio/sfx/ambience_yard.ogg")
 const AMBIENCE_VOLUME_DB := -22.0
 ## 구조물 종류. game/world/surfaces.gd의 재질 이름이다.
@@ -117,7 +121,10 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	_sun.rotation_degrees = Vector3(-48.0, 35.0, 0.0)
+	var environment: Environment = ($WorldEnvironment as WorldEnvironment).environment
+	# 맑은 날 뭉게구름(해 고도 48도). 사진 속 해의 방위로 조명을 돌린다.
+	Dressing.use_sky(environment, SKY, SKY_SUN, SKY_ENERGY, _sun)
+	Dressing.add_far_ground(self, "floor")
 	($Floor/Mesh as MeshInstance3D).material_override = Surfaces.material("floor")
 	build_arena(Vector2(60.0, 80.0), WALL_HEIGHT, WALL_COLOR)
 	_add_backdrop()

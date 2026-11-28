@@ -135,6 +135,7 @@ docs/                 기술 결정 기록, 에셋 품질 기준
 | 병사 | Varco 3D: 이미지 → 3D → 리깅 → 소총 동작 8종 | `merge_character.py`로 동작별 GLB를 하나로 합침 |
 | 1인칭 팔 | Varco 손가락 리깅에서 손가락을 굽혀 잘라냄 | `extract_arms.py` |
 | 맵 재질 | Poly Haven CC0 (1K) | `maps/textures/README.md` |
+| 하늘 | Poly Haven CC0 HDRI를 톤매핑한 파노라마(사진 속 해에 조명 방향을 맞춤) | `maps/sky/README.md` |
 | 효과음 | ElevenLabs 효과음 생성 후 잘라서 음량 맞춤 | `game/audio/sfx/README.md` |
 
 AI로 만든 메시를 넣기 전에는 `tools/asset_pipeline/analyze.py`로 삼각형 수·UV·파일 크기를 재고,
@@ -144,6 +145,8 @@ AI로 만든 메시를 넣기 전에는 `tools/asset_pipeline/analyze.py`로 삼
 
 화면 확인: 창이 없는 환경에서도 `xvfb-run godot --rendering-driver opengl3 res://tests/shots/shots.tscn -- --out=build/shots`
 로 무기별 지향/정조준 화면을 PNG로 저장할 수 있습니다.
+
+맵 그래픽 비교: `xvfb-run godot --rendering-driver opengl3 res://tests/shots/views.tscn -- --map=depot --out=/tmp/views`가 맵마다 같은 자리 다섯 곳(마지막은 하늘 속 해를 향함)을 찍습니다.
 
 ## 테스트
 
