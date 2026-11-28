@@ -3,13 +3,17 @@ extends Node
 ## 실행: godot --headless --fixed-fps 60 res://tests/smoke/menu_smoke.tscn
 
 const MAIN_SCENE := preload("res://game/main.tscn")
+const Settings := preload("res://game/core/settings.gd")
 
 var _game: Node
 var _tick := 0
 var _failures := PackedStringArray()
+## 테스트가 바꾼 설정을 끝날 때 되돌린다(같은 기기의 다른 테스트와 실제 플레이에 남지 않게).
+var _saved_primary: Variant
 
 
 func _ready() -> void:
+	_saved_primary = Settings.read(Settings.PRIMARY, 0)
 	_game = MAIN_SCENE.instantiate()
 	add_child(_game)
 
@@ -50,6 +54,7 @@ func _physics_process(_delta: float) -> void:
 			# 봇 대전이 메뉴에서 시작한 뒤에도 오류 없이 몇 초간 돈다.
 			for failure in _failures:
 				printerr("MENU SMOKE FAIL ", failure)
+			Settings.write(Settings.PRIMARY, _saved_primary)
 			print("menu smoke: %d failures" % _failures.size())
 			get_tree().quit(1 if _failures.size() > 0 else 0)
 

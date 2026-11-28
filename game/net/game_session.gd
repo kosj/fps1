@@ -873,8 +873,10 @@ func choose_primary(id: int) -> bool:
 	return false
 
 
+## 고른 주무기. 테스트용 스크립트 봇(--bot)은 저장된 설정과 상관없이 --primary(없으면 기본)를 쓴다.
 func _saved_primary() -> int:
-	return int(_args.get("primary", Settings.read(Settings.PRIMARY, Armory.DEFAULT_PRIMARY)))
+	var saved = Armory.DEFAULT_PRIMARY if _bot != null else Settings.read(Settings.PRIMARY, 0)
+	return int(_args.get("primary", saved))
 
 
 @rpc("any_peer", "call_remote", "reliable")
