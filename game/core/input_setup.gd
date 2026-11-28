@@ -14,8 +14,6 @@ const KEY_ACTIONS := {
 	"grenade": KEY_G,
 	"weapon_1": KEY_1,
 	"weapon_2": KEY_2,
-	"weapon_3": KEY_3,
-	"weapon_4": KEY_4,
 	"scoreboard": KEY_TAB,
 	"sens_down": KEY_MINUS,
 	"sens_up": KEY_EQUAL,

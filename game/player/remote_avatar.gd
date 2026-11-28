@@ -9,12 +9,7 @@ const FLASH_TIME := 0.05
 const TRACER_LENGTH := 45.0
 const SOLDIER := preload("res://game/player/models/soldier.glb")
 ## 무기 칸 순서. game/player/player.gd의 기본 무장과 같다.
-const WEAPONS := [
-	preload("res://game/weapons/data/rifle_vk7.tres"),
-	preload("res://game/weapons/data/smg_kestrel.tres"),
-	preload("res://game/weapons/data/shotgun_m90.tres"),
-	preload("res://game/weapons/data/sniper_lr12.tres"),
-]
+const Armory := preload("res://game/weapons/armory.gd")
 const MAX_SAMPLES := 40
 ## 모델 원본 키(약 1m)를 히트 판정 키에 맞추는 배율.
 const MODEL_HEIGHT := 1.0
@@ -124,12 +119,13 @@ func build() -> void:
 
 
 ## 들고 있는 무기를 바꾼다. 모델과 발사음이 그 무기 것으로 바뀐다.
-func set_weapon(slot: int) -> void:
-	slot = clampi(slot, 0, WEAPONS.size() - 1)
-	if slot == _weapon_slot or _shot_audio == null:
+## 들고 있는 무기를 바꾼다. id는 game/weapons/armory.gd의 무기 번호.
+func set_weapon(id: int) -> void:
+	id = clampi(id, 0, Armory.WEAPONS.size() - 1)
+	if id == _weapon_slot or _shot_audio == null:
 		return
-	_weapon_slot = slot
-	var data: Resource = WEAPONS[slot]
+	_weapon_slot = id
+	var data: Resource = Armory.WEAPONS[id]
 	_shot_audio.stream = data.get("shot_sound")
 	if _grip_bone < 0 or _support_bone < 0:
 		return

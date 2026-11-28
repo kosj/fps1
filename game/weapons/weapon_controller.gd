@@ -16,6 +16,7 @@ const InputCmd := preload("res://game/player/input_cmd.gd")
 const WeaponData := preload("res://game/weapons/weapon_data.gd")
 const WeaponState := preload("res://game/weapons/weapon_state.gd")
 const Recoil := preload("res://game/weapons/recoil.gd")
+const Armory := preload("res://game/weapons/armory.gd")
 const WORLD_MASK := 1
 ## 월드(1)와 히트박스(4). 캐릭터 몸체 캡슐(2)은 맞히지 않는다.
 const HIT_MASK := 5
@@ -47,6 +48,18 @@ func setup(player: CharacterBody3D, weapons: Array) -> void:
 	loadout = weapons
 	resolve_shot = resolve_offline
 	reset()
+
+
+## 로드아웃을 바꾼다(리스폰 때). 탄창을 채우고 첫 칸(주무기)을 든다.
+func set_loadout(weapons: Array) -> void:
+	loadout = weapons
+	slot = 0
+	reset()
+
+
+## 들고 있는 무기의 번호(game/weapons/armory.gd). 다른 플레이어에게 어떤 총을 보여 줄지 정한다.
+func weapon_id() -> int:
+	return maxi(Armory.id_of(data), 0)
 
 
 ## 모든 무기의 탄창을 채우고 상태를 처음으로 되돌린다(리스폰). 들고 있던 슬롯은 유지한다.

@@ -7,6 +7,8 @@ signal start_requested(kind: String, options: Dictionary)
 const MenuKit := preload("res://game/ui/menu_kit.gd")
 const Settings := preload("res://game/core/settings.gd")
 const Catalog := preload("res://maps/catalog.gd")
+const Armory := preload("res://game/weapons/armory.gd")
+const LoadoutPanel := preload("res://game/ui/loadout_panel.gd")
 ## 공용 서버(Render 무료 요금제). 예전 기본값(내 PC)이 저장돼 있으면 이 주소로 바꿔 보여 준다.
 const DEFAULT_ADDRESS := "wss://fps1-server.onrender.com"
 const OLD_DEFAULT_ADDRESS := "127.0.0.1:7777"
@@ -26,6 +28,7 @@ static var notice := ""
 var play_button: Button
 var range_button: Button
 var join_button: Button
+var loadout_button: Button
 var address_edit: LineEdit
 var bot_count: SpinBox
 var mode_select: OptionButton
@@ -94,6 +97,11 @@ func _ready() -> void:
 	options_row.add_child(difficulty_select)
 	left.add_child(options_row)
 
+	loadout_button = MenuKit.button("")
+	loadout_button.pressed.connect(open_loadout)
+	left.add_child(loadout_button)
+	_show_loadout()
+
 	range_button = MenuKit.button("SHOOTING RANGE")
 	range_button.pressed.connect(func() -> void: start_requested.emit("range", {}))
 	left.add_child(range_button)
@@ -130,6 +138,28 @@ func _ready() -> void:
 		var quit_button := MenuKit.button("QUIT")
 		quit_button.pressed.connect(func() -> void: get_tree().quit())
 		right.add_child(quit_button)
+
+
+## 로드아웃 화면을 연다. 고른 주무기는 저장해 두고 다음 경기부터 쓴다.
+func open_loadout() -> LoadoutPanel:
+	var panel := LoadoutPanel.new()
+	panel.selected = _saved_primary()
+	panel.chosen.connect(
+		func(id: int) -> void:
+			Settings.write(Settings.PRIMARY, id)
+			_show_loadout()
+	)
+	add_child(panel)
+	return panel
+
+
+func _saved_primary() -> int:
+	return Armory.valid_primary(int(Settings.read(Settings.PRIMARY, Armory.DEFAULT_PRIMARY)))
+
+
+func _show_loadout() -> void:
+	var primary := _saved_primary()
+	loadout_button.text = "LOADOUT:  %s + %s" % [Armory.title(primary), Armory.title(Armory.SIDEARM)]
 
 
 func _on_play() -> void:

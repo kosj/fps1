@@ -6,6 +6,9 @@ extends RefCounted
 const HitMath := preload("res://game/combat/hit_math.gd")
 const Protocol := preload("res://game/net/net_protocol.gd")
 const Grenades := preload("res://game/combat/grenades.gd")
+const Armory := preload("res://game/weapons/armory.gd")
+## 리스폰 뒤 이 시간(초) 안에, 아직 쏘지 않았으면 로드아웃을 바로 바꿀 수 있다.
+const SWAP_TIME := 6.0
 const BOT_SIGHT_RANGE := 60.0
 const BOT_NEAR_RANGE := 10.0
 
@@ -91,7 +94,7 @@ static func snapshot_rows(peers: Dictionary) -> Array:
 		if peers[id]["fired"]:
 			flags |= Protocol.FLAG_FIRED
 			peers[id]["fired"] = false
-		flags |= (int(player.weapon.slot) & Protocol.SLOT_MASK) << Protocol.SLOT_SHIFT
+		flags |= (int(player.weapon.weapon_id()) & Protocol.SLOT_MASK) << Protocol.SLOT_SHIFT
 		rows.append([id, player.global_position, player.rotation.y, flags, peers[id]["team"]])
 	return rows
 
@@ -164,3 +167,13 @@ static func bot_cmd(peers: Dictionary, id: int, domination, nav_points: Array, d
 		delta, player.eye_position(), player.global_position, player.horizontal_speed(),
 		visible, goals
 	)
+
+
+## 주무기를 고른다. 막 태어나 아직 쏘지 않았으면 바로 바꾸고 true, 아니면 다음 리스폰 때 바꾸고 false.
+static func choose_primary(entry: Dictionary, id: int) -> bool:
+	entry["primary"] = Armory.valid_primary(id)
+	var player = entry["player"]
+	if player.alive and float(entry["swap_left"]) > 0.0:
+		player.set_primary(int(entry["primary"]))
+		return true
+	return false

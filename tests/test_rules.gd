@@ -5,6 +5,8 @@ const AimAssist := preload("res://game/player/aim_assist.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Grenades := preload("res://game/combat/grenades.gd")
 const InputCmd := preload("res://game/player/input_cmd.gd")
+const Armory := preload("res://game/weapons/armory.gd")
+const Authority := preload("res://game/net/authority.gd")
 const EYE := Vector3(0.0, 1.6, 0.0)
 
 
@@ -107,3 +109,45 @@ func test_grenade_button_survives_the_network_format() -> String:
 	if back == null or not back.has(InputCmd.GRENADE) or not back.has(InputCmd.FIRE):
 		return "the grenade button was lost in to_array / from_array"
 	return ""
+
+
+func test_loadout_is_a_primary_and_the_pistol() -> String:
+	for id: int in Armory.PRIMARIES:
+		var weapons: Array = Armory.loadout(id)
+		if weapons != [Armory.WEAPONS[id], Armory.WEAPONS[Armory.SIDEARM]]:
+			return "loadout for %d is %s" % [id, weapons]
+	# 설정이나 네트워크에서 온 엉뚱한 번호(권총, 범위 밖)는 기본 주무기가 된다.
+	for wrong: int in [Armory.SIDEARM, -1, 99]:
+		if Armory.loadout(wrong)[0] != Armory.WEAPONS[Armory.DEFAULT_PRIMARY]:
+			return "invalid primary %d was accepted" % wrong
+	for id in Armory.WEAPONS.size():
+		if Armory.id_of(Armory.WEAPONS[id]) != id or Armory.ICONS[id] == null:
+			return "weapon %d has no id or icon" % id
+		for value: float in Armory.stats(id):
+			if value <= 0.0 or value > 1.0:
+				return "stat %f of weapon %d is outside 0..1" % [value, id]
+	return ""
+
+
+func test_primary_swaps_now_only_right_after_spawning() -> String:
+	var player := FakePlayer.new()
+	var entry := {"player": player, "swap_left": 2.0, "primary": 0}
+	if not Authority.choose_primary(entry, 3) or player.primary != 3:
+		return "a fresh spawn should switch weapons at once"
+	entry["swap_left"] = 0.0
+	if Authority.choose_primary(entry, 1) or player.primary != 3 or entry["primary"] != 1:
+		return "after the swap window the choice should wait for the next spawn"
+	player.alive = false
+	entry["swap_left"] = 2.0
+	if Authority.choose_primary(entry, 2) or player.primary != 3:
+		return "a dead player should not switch until he respawns"
+	return ""
+
+
+## choose_primary가 쓰는 부분만 흉내 낸 플레이어.
+class FakePlayer:
+	var alive := true
+	var primary := 0
+
+	func set_primary(id: int) -> void:
+		primary = id

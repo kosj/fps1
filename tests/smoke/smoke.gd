@@ -7,7 +7,7 @@ const PLAYER_SCENE := preload("res://game/player/player.tscn")
 const TargetDummy := preload("res://game/combat/target_dummy.gd")
 const ACTIONS := [
 	"move_forward", "move_back", "move_left", "move_right",
-	"jump", "sprint", "crouch", "reload", "fire", "aim", "weapon_3",
+	"jump", "sprint", "crouch", "reload", "fire", "aim", "weapon_2",
 ]
 const LEDGE_HEIGHT := 1.0
 
@@ -84,15 +84,14 @@ func _physics_process(_delta: float) -> void:
 			_expect(absf(position_now.y - LEDGE_HEIGHT) < 0.15, "player is not standing on the ledge")
 			_expect(position_now.z < -0.6, "player did not move onto the ledge")
 		505:
-			# 산탄총으로 바꿔 5 m 앞 더미를 쏜다.
+			# 주무기를 산탄총으로 바꿔 5 m 앞 더미를 쏜다.
 			_player.global_position = Vector3(0.0, 0.05, -25.0)
 			_player.velocity = Vector3.ZERO
-			Input.action_press("weapon_3")
-		507:
-			Input.action_release("weapon_3")
+			_player.call("set_primary", 2)
 		550:
 			var weapon: Node = _player.get("weapon")
-			_expect(weapon.get("slot") == 2, "pressing 3 did not switch to the shotgun")
+			var pellets: int = weapon.get("data").get("pellets")
+			_expect(pellets > 1, "choosing the shotgun as primary did not arm it")
 			_shots_before = weapon.get("shots_fired")
 			_hits_before = weapon.get("hits_landed")
 			Input.action_press("fire")
@@ -105,7 +104,13 @@ func _physics_process(_delta: float) -> void:
 			_expect(shots == 1, "one trigger pull fired %d shotgun shells" % shots)
 			_expect(hits >= 2, "only %d of 8 pellets hit a dummy 5 m away" % hits)
 			print("smoke: shotgun landed %d of 8 pellets" % hits)
+			# 2번(권총)으로 바꾼다.
+			Input.action_press("weapon_2")
+		571:
+			Input.action_release("weapon_2")
 		572:
+			var held: Resource = _player.get("weapon").get("data")
+			_expect(held.get("display_name") == "P-9", "pressing 2 did not draw the pistol")
 			_player.call("set_touch", true)
 		578:
 			_expect(_player.get("touch") != null, "set_touch did not create touch controls")

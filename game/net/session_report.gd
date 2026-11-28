@@ -18,6 +18,9 @@ static func check(is_client: bool, args: Dictionary, stats: Dictionary) -> Packe
 	_at_least(failures, args, stats, "expect-grenades", "grenades", "grenades thrown")
 	_at_least(failures, args, stats, "expect-blast-hits", "blast_hits", "grenade hits")
 	_at_least(failures, args, stats, "expect-zone-captures", "zone_captures", "zone captures")
+	var held := int(stats.get("primary", -1))
+	if args.has("expect-primary") and held != int(args["expect-primary"]):
+		failures.append("holding primary %d, wanted %s" % [held, args["expect-primary"]])
 	if args.has("max-corrections"):
 		var allowed := int(args["max-corrections"])
 		if int(stats["corrections"]) > allowed:

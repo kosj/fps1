@@ -26,12 +26,7 @@ const SFX_DRY := preload("res://game/audio/sfx/dry.ogg")
 const SFX_RELOAD := preload("res://game/audio/sfx/reload.ogg")
 const SFX_STEP := preload("res://game/audio/sfx/step.ogg")
 const SFX_IMPACT := preload("res://game/audio/sfx/impact.ogg")
-const LOADOUT := [
-	preload("res://game/weapons/data/rifle_vk7.tres"),
-	preload("res://game/weapons/data/smg_kestrel.tres"),
-	preload("res://game/weapons/data/shotgun_m90.tres"),
-	preload("res://game/weapons/data/sniper_lr12.tres"),
-]
+const Armory := preload("res://game/weapons/armory.gd")
 const Settings := preload("res://game/core/settings.gd")
 ## 예측 보정으로 생긴 위치 차이를 화면에서 풀어 주는 속도와, 보간하지 않고 바로 옮기는 거리.
 const CORRECTION_SMOOTHING := 12.0
@@ -70,6 +65,8 @@ var require_mouse_capture := true
 ## 마우스 감도 배율. - 와 = 키로 조절하고 설정 파일에 저장한다.
 var sensitivity_scale := 1.0
 var weapon: WeaponController
+## 주무기 번호(game/weapons/armory.gd). 무기 칸 0은 이 총, 1은 권총이다.
+var primary := Armory.DEFAULT_PRIMARY
 ## 남은 수류탄. 클라이언트에서는 서버가 알려 주는 값으로 맞춘다.
 var grenades := 2:
 	set(value):
@@ -127,7 +124,7 @@ func _ready() -> void:
 		_build_view()
 	else:
 		_camera.current = false
-	weapon.setup(self, LOADOUT)
+	weapon.setup(self, Armory.loadout(primary))
 	if is_local:
 		hud.set_health(health, MAX_HEALTH)
 		sensitivity_scale = Settings.sensitivity()
@@ -193,10 +190,6 @@ func eye_position() -> Vector3:
 	return global_position + Vector3.UP * _head.position.y
 
 
-func head_pitch() -> float:
-	return _head.rotation.x
-
-
 ## 시점을 돌린다(라디안). 마우스 입력과 반동이 함께 쓴다.
 func add_view_rotation(yaw: float, pitch: float) -> void:
 	rotate_y(yaw)
@@ -216,14 +209,14 @@ func gather_cmd() -> InputCmd:
 		cmd.move = touch.move
 		cmd.buttons = touch.buttons()
 		var steps := touch.take_weapon_steps()
-		_selected_slot = (_selected_slot + steps) % LOADOUT.size()
+		_selected_slot = (_selected_slot + steps) % weapon.loadout.size()
 		cmd.weapon = _selected_slot
 		return cmd
 	cmd.move = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	for action: String in _button_actions:
 		if Input.is_action_pressed(action):
 			cmd.buttons |= int(_button_actions[action])
-	for index in LOADOUT.size():
+	for index in weapon.loadout.size():
 		if Input.is_action_pressed("weapon_%d" % (index + 1)):
 			_selected_slot = index
 	cmd.weapon = _selected_slot
@@ -296,8 +289,22 @@ func restore_state(state: Array) -> void:
 	global_position = state[0]
 
 
-## 서버가 알려 준 체력과 생존 여부를 반영한다.
-func apply_net_status(new_health: float, new_alive: bool, ammo: int, server_slot: int) -> void:
+## 주무기를 바꾼다(권총은 늘 함께 든다). 같은 주무기면 아무것도 하지 않는다.
+func set_primary(id: int) -> void:
+	id = Armory.valid_primary(id)
+	if id == primary:
+		return
+	primary = id
+	_selected_slot = 0
+	if weapon != null and weapon.loadout.size() > 0:
+		weapon.set_loadout(Armory.loadout(primary))
+
+
+## 서버가 알려 준 체력, 생존 여부, 탄약, 주무기를 반영한다.
+func apply_net_status(
+	new_health: float, new_alive: bool, ammo: int, server_slot: int, server_primary: int
+) -> void:
+	set_primary(server_primary)
 	if new_alive and not alive:
 		weapon.reset()
 		move_state = MoveState.NORMAL
@@ -384,9 +391,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		# 마우스 휠로 다음/이전 무기.
 		var button := (event as InputEventMouseButton).button_index
 		if button == MOUSE_BUTTON_WHEEL_DOWN:
-			_selected_slot = (_selected_slot + 1) % LOADOUT.size()
+			_selected_slot = (_selected_slot + 1) % weapon.loadout.size()
 		elif button == MOUSE_BUTTON_WHEEL_UP:
-			_selected_slot = (_selected_slot + LOADOUT.size() - 1) % LOADOUT.size()
+			_selected_slot = (_selected_slot + 1) % weapon.loadout.size()
 	elif event is InputEventMouseMotion and captured:
 		var motion := event as InputEventMouseMotion
 		var zoom := weapon.data.ads_fov / BASE_FOV

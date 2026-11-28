@@ -14,11 +14,11 @@ func test_input_round_trip() -> String:
 	cmd.pitch = -0.4
 	cmd.buttons = InputCmd.FIRE | InputCmd.AIM
 	cmd.view_tick = 1234.5
-	cmd.weapon = 2
+	cmd.weapon = 1
 	var copy: InputCmd = InputCmd.from_array(cmd.to_array())
 	if copy == null:
 		return "valid input was rejected"
-	if copy.weapon != 2:
+	if copy.weapon != 1:
 		return "round trip changed the weapon slot"
 	if copy.seq != 42 or copy.buttons != cmd.buttons or not copy.move.is_equal_approx(cmd.move):
 		return "round trip changed the input"

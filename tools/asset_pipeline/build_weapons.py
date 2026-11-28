@@ -1,6 +1,8 @@
-"""총기 4종을 코드로 모델링해 GLB로 내보낸다.
+"""총기 5종(주무기 4, 권총 1)을 코드로 모델링해 GLB로 내보낸다.
 
-blender -b --python build_weapons.py -- <out_dir> [--preview <png_dir>]
+blender -b --python build_weapons.py -- <out_dir> [--preview <png_dir>] [--icons <png_dir>]
+
+--icons는 무기 선택 화면에 쓰는 옆모습 아이콘(배경 투명, 총구가 오른쪽)을 만든다.
 
 AI 메시는 각진 면이 뭉개지므로 총기는 단면 돌출 + 베벨 + 면적 가중 노멀로 직접 만든다.
 표면은 절차적 재질(색 얼룩, 모서리 마모, 틈새 그늘)을 총 한 자루당 1K 텍스처 두 장
@@ -573,12 +575,101 @@ def texture(root, name):
             poly.material_index = 0
 
 
+def build_pistol():
+    g = Gun("pistol_p9")
+    # 슬라이드(움직이는 부품): 앞이 비스듬히 깎인 상자, 뒤쪽 미끄럼 방지 홈, 배출구, 가늠자와 가늠쇠
+    g.profile([(-0.085, -0.011), (0.105, -0.011), (0.105, 0.009), (0.097, 0.017),
+               (-0.08, 0.017), (-0.085, 0.012)], 0.024, "metal", "action", bevel=0.002)
+    for k in range(6):
+        y = -0.079 + k * 0.0055
+        for side in (-1, 1):
+            g.box(y, y + 0.0025, -0.006, 0.013, 0.0015, "steel", "action", x=side * 0.0122,
+                  bevel=0.0)
+    g.box(-0.012, 0.03, 0.005, 0.0172, 0.004, "steel", "action", x=0.0105, bevel=0.0005)
+    g.box(0.087, 0.097, 0.017, 0.0235, 0.0045, "metal", "action", bevel=0.0005)
+    g.box(0.0905, 0.0935, 0.0215, 0.0237, 0.0046, "brass", "action", bevel=0.0)
+    for side in (-1, 1):
+        g.box(-0.078, -0.066, 0.017, 0.0245, 0.007, "metal", "action", x=side * 0.0065,
+              bevel=0.0006)
+    # 총열 끝(슬라이드 앞으로 살짝 나온다)
+    g.tube(0.095, 0.107, 0.0058, "steel", seg=12)
+    g.tube(0.104, 0.1075, 0.0032, "rubber", seg=10)
+    # 프레임: 슬라이드 아래 몸통, 앞쪽 레일, 방아쇠울, 방아쇠
+    g.profile([(-0.074, -0.011), (0.1, -0.011), (0.1, -0.026), (0.04, -0.028),
+               (-0.03, -0.03), (-0.068, -0.03), (-0.078, -0.02)], 0.022, "polymer", bevel=0.002)
+    g.box(0.045, 0.098, -0.033, -0.026, 0.017, "polymer", bevel=0.001)
+    for y in (0.052, 0.066, 0.08):
+        g.box(y, y + 0.006, -0.036, -0.033, 0.018, "polymer", bevel=0.0)
+    g.box(-0.012, 0.05, -0.054, -0.049, 0.012, "polymer", bevel=0.001)
+    g.profile([(0.042, -0.054), (0.05, -0.054), (0.046, -0.028), (0.038, -0.028)], 0.012,
+              "polymer", bevel=0.001)
+    g.profile([(0.01, -0.03), (0.018, -0.03), (0.02, -0.046), (0.014, -0.05), (0.012, -0.04)],
+              0.006, "steel", bevel=0.0006)
+    # 슬라이드 멈치, 분해 레버(왼쪽)
+    g.box(-0.008, 0.03, -0.015, -0.01, 0.003, "steel", x=-0.0118, bevel=0.0004)
+    g.box(0.034, 0.042, -0.02, -0.013, 0.003, "steel", x=-0.0118, bevel=0.0004)
+    # 손잡이: 뒤로 기운 손잡이와 양옆 미끄럼 방지 패널
+    # 아래로 갈수록 뒤로 기운다(약 17도). 뒤쪽 위는 손등을 받치는 꼬리(비버테일).
+    grip_shape = [(-0.082, -0.022), (-0.012, -0.03), (-0.018, -0.055), (-0.04, -0.124),
+                  (-0.088, -0.128), (-0.094, -0.09), (-0.086, -0.045)]
+    g.profile(grip_shape, 0.028, "polymer", bevel=0.003)
+    for side in (-1, 1):
+        g.profile([(-0.074, -0.048), (-0.028, -0.048), (-0.044, -0.11), (-0.086, -0.112)],
+                  0.002, "rubber", x=side * 0.0142, bevel=0.0)
+    # 탄창: 손잡이 안의 몸통과 아래로 나온 바닥판
+    g.profile([(-0.072, -0.03), (-0.028, -0.032), (-0.044, -0.126), (-0.086, -0.126)], 0.02,
+              "metal", "mag", bevel=0.001)
+    g.profile([(-0.092, -0.127), (-0.04, -0.125), (-0.042, -0.135), (-0.091, -0.137)],
+              0.03, "polymer", "mag", bevel=0.002)
+    g.muzzle = Vector((0, 0.11, 0.0))
+    return g.build()
+
+
 BUILDERS = {
     "rifle_vk7": build_rifle,
     "smg_kestrel": build_smg,
     "shotgun_m90": build_shotgun,
     "sniper_lr12": build_sniper,
+    "pistol_p9": build_pistol,
 }
+
+
+def icon(root, path):
+    """무기 선택 화면용 옆모습: 오른쪽 옆면을 직교 카메라로, 배경은 투명하게."""
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.samples = 32
+    scene.cycles.device = "CPU"
+    scene.render.resolution_x = 512
+    scene.render.resolution_y = 224
+    scene.render.film_transparent = True
+    scene.render.image_settings.color_mode = "RGBA"
+    world = bpy.data.worlds.new("icon_world")
+    world.use_nodes = True
+    world.node_tree.nodes["Background"].inputs[0].default_value = (0.6, 0.62, 0.66, 1)
+    world.node_tree.nodes["Background"].inputs[1].default_value = 0.9
+    scene.world = world
+    pts = [o.matrix_world @ Vector(c) for o in root.children if o.type == "MESH" for c in o.bound_box]
+    lo = Vector((min(p[i] for p in pts) for i in range(3)))
+    hi = Vector((max(p[i] for p in pts) for i in range(3)))
+    center = (lo + hi) / 2
+    cam_data = bpy.data.cameras.new("icon_cam")
+    cam_data.type = "ORTHO"
+    # 총마다 그림을 꽉 채운다(가로 길이와 세로 높이 중 더 빡빡한 쪽에 맞춘다).
+    aspect = scene.render.resolution_x / scene.render.resolution_y
+    cam_data.ortho_scale = max(hi.y - lo.y, (hi.z - lo.z) * aspect) * 1.08
+    cam = bpy.data.objects.new("icon_cam", cam_data)
+    scene.collection.objects.link(cam)
+    cam.location = center + Vector((1.0, 0.0, 0.0))
+    cam.rotation_euler = (center - cam.location).to_track_quat("-Z", "Y").to_euler()
+    scene.camera = cam
+    for rot, energy in (((40, 0, 80), 3.5), ((70, 0, -100), 1.2)):
+        light = bpy.data.objects.new("icon_sun", bpy.data.lights.new("icon_sun", "SUN"))
+        light.data.energy = energy
+        light.rotation_euler = tuple(math.radians(r) for r in rot)
+        scene.collection.objects.link(light)
+    scene.render.filepath = path
+    bpy.ops.render.render(write_still=True)
 
 
 def preview(root, path):
@@ -617,6 +708,7 @@ def main():
     args = sys.argv[sys.argv.index("--") + 1:]
     out_dir = args[0]
     png_dir = args[args.index("--preview") + 1] if "--preview" in args else ""
+    icon_dir = args[args.index("--icons") + 1] if "--icons" in args else ""
     os.makedirs(out_dir, exist_ok=True)
     for name, builder in BUILDERS.items():
         if os.environ.get("ONLY") and os.environ["ONLY"] != name:
@@ -638,6 +730,9 @@ def main():
         if png_dir:
             os.makedirs(png_dir, exist_ok=True)
             preview(root, os.path.join(png_dir, name + ".png"))
+        if icon_dir:
+            os.makedirs(icon_dir, exist_ok=True)
+            icon(root, os.path.join(icon_dir, name + ".png"))
 
 
 main()
