@@ -161,6 +161,7 @@ jobs:
         continue-on-error: true
         run: |
           timeout 200 ~/godot/godot --headless -- --connect=wss://fps1-server.onrender.com --bot=shooter \
+            --primary=1 --expect-primary=1 \
             --exit-after=110 2>&1 | tee public.log
           grep -E "NETSTATS|NETTEST|network:" public.log
 
