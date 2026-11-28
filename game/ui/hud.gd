@@ -7,6 +7,8 @@ const MARGIN := 32
 const FEED_TIME := 5.0
 const FEED_LINES := 5
 const NARROW_WIDTH := 760.0
+## 화면 높이(캔버스 단위)가 이보다 낮으면 결과와 점수판을 작게 그린다.
+const SHORT_HEIGHT := 600.0
 ## 색은 아군 파랑, 적 빨강으로 보이므로(팀 이름과 무관) 점수판 머리글도 그 기준으로 쓴다.
 const SCORE_HEADERS := ["YOUR TEAM", "ENEMY"]
 
@@ -24,6 +26,7 @@ var _result_dim: ColorRect
 var _result_title: Label
 var _result_detail: Label
 var _score_panel: PanelContainer
+var _stack: VBoxContainer
 var _score_columns: Array = []
 var _score_hash := 0
 var _message_label: Label
@@ -127,29 +130,47 @@ func set_result(title: String, color: Color, detail: String) -> void:
 		_result_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_result_dim.color = Color(0.0, 0.0, 0.0, 0.55)
 		root.add_child(_result_dim)
-		var box := VBoxContainer.new()
-		box.set_anchors_preset(Control.PRESET_CENTER)
-		box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-		box.grow_vertical = Control.GROW_DIRECTION_BOTH
-		# 아래에 점수판이 오므로 결과 문구는 화면 위쪽에 둔다.
-		box.position.y -= 150.0
-		box.alignment = BoxContainer.ALIGNMENT_CENTER
-		box.add_theme_constant_override("separation", 14)
-		_result_dim.add_child(box)
+		# 결과 문구는 점수판과 같은 세로 묶음의 위쪽에 들어간다. 어둡게 하는 막은 그 묶음 아래에 둔다.
+		var stack := _center_stack()
+		if _result_dim.get_index() > stack.get_index():
+			root.move_child(_result_dim, stack.get_index())
 		_result_title = Label.new()
 		_result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_result_title.add_theme_font_size_override("font_size", 96)
+		_result_title.add_theme_font_size_override("font_size", 64 if _is_short() else 96)
 		_result_title.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
 		_result_title.add_theme_constant_override("outline_size", 10)
-		box.add_child(_result_title)
+		stack.add_child(_result_title)
+		stack.move_child(_result_title, 0)
 		_result_detail = Label.new()
 		_result_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_result_detail.add_theme_font_size_override("font_size", 34)
-		box.add_child(_result_detail)
-	_result_dim.visible = title != ""
+		_result_detail.add_theme_font_size_override("font_size", 24 if _is_short() else 34)
+		stack.add_child(_result_detail)
+		stack.move_child(_result_detail, 1)
+	var shown := title != ""
+	_result_dim.visible = shown
+	_result_title.visible = shown
+	_result_detail.visible = shown
 	_result_title.text = title
 	_result_title.add_theme_color_override("font_color", color)
 	_result_detail.text = detail
+
+
+## 화면 가운데에 세로로 쌓는 묶음(결과 문구, 점수판). 들어 있는 것만큼만 차지하고 가운데에 놓인다.
+func _center_stack() -> VBoxContainer:
+	if _stack == null:
+		var root := _damage_overlay.get_parent() as Control
+		_stack = VBoxContainer.new()
+		_stack.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_stack.alignment = BoxContainer.ALIGNMENT_CENTER
+		_stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_stack.add_theme_constant_override("separation", 10)
+		root.add_child(_stack)
+	return _stack
+
+
+## 가로로 든 휴대폰처럼 화면 높이가 낮으면 결과와 점수판 글씨를 줄인다.
+func _is_short() -> bool:
+	return get_viewport().get_visible_rect().size.y < SHORT_HEIGHT
 
 
 ## 점수판. lines는 [팀, 이름, 킬, 데스, 나인지]. 내 팀이 왼쪽에 온다.
@@ -181,19 +202,15 @@ func set_scoreboard(shown: bool, lines: Array, own_team: int) -> void:
 
 
 func _build_scoreboard() -> void:
-	var root := _damage_overlay.get_parent() as Control
 	_score_panel = PanelContainer.new()
-	_score_panel.set_anchors_preset(Control.PRESET_CENTER)
-	_score_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_score_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
-	_score_panel.position.y += 190.0
+	_score_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_score_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.03, 0.04, 0.06, 0.78)
-	style.set_content_margin_all(18.0)
+	style.set_content_margin_all(12.0 if _is_short() else 18.0)
 	style.set_corner_radius_all(6)
 	_score_panel.add_theme_stylebox_override("panel", style)
-	root.add_child(_score_panel)
+	_center_stack().add_child(_score_panel)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 48)
 	_score_panel.add_child(row)
@@ -201,7 +218,7 @@ func _build_scoreboard() -> void:
 		var grid := GridContainer.new()
 		grid.columns = 3
 		grid.add_theme_constant_override("h_separation", 22)
-		grid.add_theme_constant_override("v_separation", 4)
+		grid.add_theme_constant_override("v_separation", 1 if _is_short() else 4)
 		row.add_child(grid)
 		_score_columns.append(grid)
 
@@ -209,9 +226,9 @@ func _build_scoreboard() -> void:
 func _score_cell(text: String, color: Color, wide: bool) -> Label:
 	var cell := Label.new()
 	cell.text = text
-	cell.add_theme_font_size_override("font_size", 24)
+	cell.add_theme_font_size_override("font_size", 19 if _is_short() else 24)
 	cell.add_theme_color_override("font_color", color)
-	cell.custom_minimum_size.x = 170.0 if wide else 36.0
+	cell.custom_minimum_size.x = 160.0 if wide else 32.0
 	cell.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if wide else HORIZONTAL_ALIGNMENT_RIGHT
 	return cell
 

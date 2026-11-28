@@ -10,6 +10,7 @@ const JUMP := Vector2(1205.0, 455.0)
 const AIM := Vector2(1030.0, 645.0)
 const WEAPON := Vector2(1090.0, 420.0)
 const PAUSE := Vector2(60.0, 60.0)
+const SCORE := Vector2(140.0, 60.0)
 
 
 func test_left_side_drag_moves_and_sprints() -> String:
@@ -123,3 +124,20 @@ func test_pause_button_and_release_all() -> String:
 		message = "release_all should clear held buttons and the stick"
 	touch.free()
 	return message
+
+
+func test_score_button_holds_the_scoreboard_action() -> String:
+	# 게임에서는 game/core/input_setup.gd가 등록한다. 테스트 실행기에는 없으므로 직접 만든다.
+	if not InputMap.has_action("scoreboard"):
+		InputMap.add_action("scoreboard")
+	var touch := TouchControls.new()
+	touch.handle_touch(3, SCORE, true)
+	var held := Input.is_action_pressed("scoreboard")
+	touch.handle_touch(3, SCORE, false)
+	var released := not Input.is_action_pressed("scoreboard")
+	touch.free()
+	if not held:
+		return "holding TAB should press the scoreboard action"
+	if not released:
+		return "letting go of TAB should release the scoreboard action"
+	return ""

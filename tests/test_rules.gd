@@ -9,6 +9,7 @@ const Armory := preload("res://game/weapons/armory.gd")
 const Authority := preload("res://game/net/authority.gd")
 const Progression := preload("res://game/core/progression.gd")
 const XpTracker := preload("res://game/match/xp_tracker.gd")
+const Names := preload("res://game/core/names.gd")
 const EYE := Vector3(0.0, 1.6, 0.0)
 
 
@@ -214,4 +215,21 @@ func test_xp_tracker_awards_kills_and_one_match_result() -> String:
 	tracker.on_match_state(true, 5, 30)
 	if tracker.earned_this_match != Progression.LOSS_XP:
 		return "the next lost match counted %d xp" % tracker.earned_this_match
+	return ""
+
+
+func test_names_are_cleaned_and_kept_unique() -> String:
+	if Names.sanitize("  Ace   of <b>Spades</b>!!  ") != "Ace of bSpadesb":
+		return "sanitize gave '%s'" % Names.sanitize("  Ace   of <b>Spades</b>!!  ")
+	if Names.sanitize("한글이름") != "" or Names.sanitize("   ") != "":
+		return "names without allowed letters should become empty"
+	if Names.sanitize("x".repeat(40)).length() != Names.MAX_LENGTH:
+		return "long names are not cut"
+	var peers := {1: {"name": "Viper"}, 2: {"name": "P-2"}}
+	if not Names.rename(peers, 2, "Viper") or peers[2]["name"] != "Viper2":
+		return "a taken name was not made unique: %s" % peers[2]["name"]
+	if Names.rename(peers, 2, "###") or peers[2]["name"] != "Viper2":
+		return "an empty name should be refused"
+	if Names.rename(peers, 9, "Ghost"):
+		return "renaming someone who is not there should fail"
 	return ""

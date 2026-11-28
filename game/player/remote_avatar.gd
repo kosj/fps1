@@ -46,6 +46,7 @@ var _hold_offset := Vector2(-0.1, 0.07)
 var _grip_bone := -1
 var _support_bone := -1
 var _shown_alive := true
+var _tag: Label3D
 var _death_left := 0.0
 
 
@@ -120,6 +121,26 @@ func build() -> void:
 
 ## 들고 있는 무기를 바꾼다. 모델과 발사음이 그 무기 것으로 바뀐다.
 ## 들고 있는 무기를 바꾼다. id는 game/weapons/armory.gd의 무기 번호.
+## 머리 위 이름표. 아군에게만 보인다(적은 이름을 숨겨 위치를 들키지 않게 한다).
+func set_tag(text: String, shown: bool) -> void:
+	shown = shown and text != ""
+	if _tag == null:
+		if not shown:
+			return
+		_tag = Label3D.new()
+		_tag.position = Vector3(0.0, HitMath.STAND_HEIGHT + 0.35, 0.0)
+		_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_tag.fixed_size = true
+		_tag.pixel_size = 0.0011
+		_tag.font_size = 28
+		_tag.outline_size = 8
+		_tag.modulate = Color(0.6, 0.82, 1.0)
+		_tag.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_tag)
+	_tag.text = text
+	_tag.visible = shown
+
+
 func set_weapon(id: int) -> void:
 	id = clampi(id, 0, Armory.WEAPONS.size() - 1)
 	if id == _weapon_slot or _shot_audio == null:

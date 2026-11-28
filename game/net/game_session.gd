@@ -41,6 +41,7 @@ const Armory := preload("res://game/weapons/armory.gd")
 const Prediction := preload("res://game/net/prediction.gd")
 const XpTracker := preload("res://game/match/xp_tracker.gd")
 const Progression := preload("res://game/core/progression.gd")
+const Names := preload("res://game/core/names.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -448,6 +449,7 @@ func _add_participant(id: int, kind: String) -> Dictionary:
 		"respawn": 0.0,
 		"kills": 0,
 		"deaths": 0,
+		"name": Names.first_name(id, kind),
 	}
 	# 같은 프로세스에서 화면에 보여야 하는 다른 참가자에게는 임시 몸체를 붙인다.
 	if mode == Mode.LOCAL_MATCH and kind != "local":
@@ -491,6 +493,7 @@ func _recolor_avatars() -> void:
 		var avatar: RemoteAvatar = _peers[id]["avatar"]
 		if avatar != null:
 			avatar.set_color(_view.relative_color(int(_peers[id]["team"])))
+			avatar.set_tag(_peers[id]["name"], int(_peers[id]["team"]) == _view.own_team)
 
 
 ## 클라이언트가 보낸 입력을 받는다. 보낸 쪽을 믿지 않고 형식, 순서, 양을 모두 검사한다.
@@ -785,6 +788,7 @@ func _on_connected() -> void:
 	_local = _spawn_player(true, 0)
 	_local.weapon.resolve_shot = _client_resolve_shot
 	_rpc_loadout.rpc_id(1, _saved_primary())
+	_rpc_name.rpc_id(1, Names.saved() if _bot == null else "Test-" + str(_args["bot"]))
 	_start_xp()
 	print("connected as peer %d" % multiplayer.get_unique_id())
 
@@ -895,6 +899,13 @@ func _start_xp() -> void:
 		_view.xp = XpTracker.new(_local.hud, keep)
 
 
+## 접속한 사람의 이름. 다듬어서 다른 사람과 겹치지 않게 한 뒤 모두에게 점수판으로 알린다.
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_name(wanted: String) -> void:
+	if mode == Mode.SERVER and Names.rename(_peers, multiplayer.get_remote_sender_id(), wanted):
+		_send_scores()
+
+
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_loadout(id: int) -> void:
 	var sender := multiplayer.get_remote_sender_id()
@@ -921,6 +932,7 @@ func _rpc_scores(scores: Array) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _rpc_kill(killer: int, victim: int, team: int, headshot: bool, scores: Array) -> void:
 	_score_rows = scores
+	_view.learn_names(scores)
 	if mode == Mode.CLIENT and _local != null:
 		var own_id := multiplayer.get_unique_id()
 		_view.show_kill(_local.hud, killer, victim, team, headshot, own_id)
@@ -965,6 +977,8 @@ func _finish() -> void:
 		stats["primary"] = _local.primary
 	if _view.xp != null:
 		stats["xp"] = _view.xp.earned
+	if not _view.names.is_empty():
+		stats["names"] = _view.names.values()
 	if _remote_max_x > _remote_min_x:
 		stats["remote_travel"] = _remote_max_x - _remote_min_x
 	var role := "local"

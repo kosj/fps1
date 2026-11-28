@@ -68,14 +68,14 @@ static func find_target(
 	return [best_id, best_distance, best_headshot]
 
 
-## 점수판 줄. 각 항목은 [id, 팀, 킬, 데스, 봇 여부]이고 킬이 많은 순이다.
+## 점수판 줄. 각 항목은 [id, 팀, 킬, 데스, 봇 여부, 이름]이고 킬이 많은 순이다.
 static func score_rows(peers: Dictionary) -> Array:
 	var rows: Array = []
 	for id: int in peers:
 		var entry: Dictionary = peers[id]
 		rows.append([
 			id, int(entry["team"]), int(entry["kills"]), int(entry["deaths"]),
-			str(entry["kind"]) == "bot",
+			str(entry["kind"]) == "bot", str(entry["name"]),
 		])
 	rows.sort_custom(func(a: Array, b: Array) -> bool: return int(a[2]) > int(b[2]))
 	return rows

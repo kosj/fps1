@@ -10,6 +10,7 @@ const Catalog := preload("res://maps/catalog.gd")
 const Armory := preload("res://game/weapons/armory.gd")
 const LoadoutPanel := preload("res://game/ui/loadout_panel.gd")
 const Progression := preload("res://game/core/progression.gd")
+const Names := preload("res://game/core/names.gd")
 ## 공용 서버(Render 무료 요금제). 예전 기본값(내 PC)이 저장돼 있으면 이 주소로 바꿔 보여 준다.
 const DEFAULT_ADDRESS := "wss://fps1-server.onrender.com"
 const OLD_DEFAULT_ADDRESS := "127.0.0.1:7777"
@@ -31,6 +32,7 @@ var range_button: Button
 var join_button: Button
 var loadout_button: Button
 var address_edit: LineEdit
+var name_edit: LineEdit
 var bot_count: SpinBox
 var mode_select: OptionButton
 var map_select: OptionButton
@@ -50,6 +52,7 @@ func _ready() -> void:
 	title_row.add_theme_constant_override("separation", 28)
 	title_row.add_child(MenuKit.label("FPS1", 48))
 	title_row.add_child(_level_badge())
+	title_row.add_child(_name_box())
 	column.add_child(title_row)
 	if notice != "":
 		var notice_label := MenuKit.label(notice, 20)
@@ -162,6 +165,31 @@ func open_loadout() -> LoadoutPanel:
 func _saved_primary() -> int:
 	var saved := Armory.valid_primary(int(Settings.read(Settings.PRIMARY, Armory.DEFAULT_PRIMARY)))
 	return Progression.allowed_primary(saved, Armory.DEFAULT_PRIMARY)
+
+
+## 제목 옆의 이름 칸. 고칠 때마다 다듬어 저장한다(온라인에서 다른 사람에게 보이는 이름).
+func _name_box() -> Control:
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 2)
+	var caption := MenuKit.label("CALLSIGN", 13)
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	caption.add_theme_color_override("font_color", Color(0.72, 0.75, 0.8))
+	box.add_child(caption)
+	name_edit = LineEdit.new()
+	name_edit.text = Names.saved()
+	name_edit.max_length = Names.MAX_LENGTH
+	name_edit.custom_minimum_size = Vector2(190.0, 34.0)
+	name_edit.add_theme_font_size_override("font_size", 18)
+	name_edit.text_changed.connect(_on_name_changed)
+	box.add_child(name_edit)
+	return box
+
+
+func _on_name_changed(text: String) -> void:
+	var clean := Names.sanitize(text)
+	if not clean.is_empty():
+		Settings.write(Names.KEY, clean)
 
 
 ## 제목 옆의 레벨 표시: 레벨, 다음 레벨까지의 막대, 경험치.

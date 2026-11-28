@@ -3,7 +3,8 @@ extends Control
 ##
 ## - 화면 왼쪽을 누른 자리에 가상 스틱이 생긴다. 끝까지 앞으로 밀면 달린다.
 ## - 화면 오른쪽을 끌면 시선이 돈다. 발사 버튼을 누른 채 끌어도 시선이 돈다.
-## - 버튼: 발사, 정조준(누를 때마다 켜고 끔), 점프, 앉기(누르는 동안), 재장전, 무기 교체, 수류탄, 일시 정지.
+## - 버튼: 발사, 정조준(누를 때마다 켜고 끔), 점프, 앉기(누르는 동안), 재장전, 무기 교체, 수류탄, 일시 정지,
+##   점수판(누르는 동안 보인다. 키보드의 Tab과 같은 "scoreboard" 동작을 누른다).
 ##
 ## 입력 해석은 handle_touch와 handle_drag에 모아 화면 없이도 테스트할 수 있게 했다.
 
@@ -86,6 +87,8 @@ func take_weapon_steps() -> int:
 
 ## 모든 터치를 놓은 상태로 되돌린다(일시 정지, 사망).
 func release_all() -> void:
+	if _held.has("score"):
+		Input.action_release("scoreboard")
 	_roles.clear()
 	_held.clear()
 	_stick_index = -1
@@ -97,6 +100,8 @@ func handle_touch(index: int, at: Vector2, pressed: bool) -> void:
 		var role: String = _roles.get(index, "")
 		_roles.erase(index)
 		_held.erase(role)
+		if role == "score":
+			Input.action_release("scoreboard")
 		if index == _stick_index:
 			_stick_index = -1
 			move = Vector2.ZERO
@@ -130,6 +135,9 @@ func _press(button: String) -> void:
 			_weapon_steps += 1
 		"pause":
 			pause_pressed.emit()
+		"score":
+			_held[button] = true
+			Input.action_press("scoreboard")
 		"reload", "grenade":
 			_tap_left[button] = TAP_HOLD_TIME
 		"jump", "crouch":
@@ -156,6 +164,7 @@ func _layout() -> Dictionary:
 		"weapon": [Vector2(area.x - 190.0, area.y - 300.0), 38.0, "GUN"],
 		"grenade": [Vector2(area.x - 315.0, area.y - 170.0), 38.0, "NADE"],
 		"pause": [Vector2(60.0, 60.0), 34.0, "II"],
+		"score": [Vector2(140.0, 60.0), 34.0, "TAB"],
 	}
 
 
