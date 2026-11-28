@@ -184,10 +184,10 @@ jobs:
         continue-on-error: true
         run: |
           base="https://${GITHUB_REPOSITORY%/*}.github.io/${GITHUB_REPOSITORY#*/}"
-          version=$(curl -s "$base/index.html" | grep -oE 'v/[0-9a-f]+' | head -1)
+          version=$(curl -s "$base/index.html" | grep -oE 'v/[0-9a-f]+' | head -1 || true)
           page=$(curl -s "$base/$version/index.html")
-          engine=$(echo "$page" | grep -oE 'engine/[0-9a-f]+' | head -1)
-          assets=$(echo "$page" | grep -oE 'assets/[0-9a-f]+\.pck' | head -1)
+          engine=$(echo "$page" | grep -oE 'engine/[0-9a-f]+' | head -1 || true)
+          assets=$(echo "$page" | grep -oE 'assets/[0-9a-f]+\.pck' | head -1 || true)
           echo "live build: $version engine: ${engine:-none} assets: ${assets:-none}"
           files="$version/index.pck"
           if [ -n "$engine" ]; then files="$files $engine/index.wasm $engine/index.js $assets"
@@ -198,7 +198,8 @@ jobs:
             grep -i '^content-encoding' /tmp/headers || echo "WEBSIZE $f not compressed"
           done
 
-      # 배포된 웹 빌드를 크롬의 휴대폰 에뮬레이션(844x390, 터치)으로 열어 봇전까지 들어가 본다.
+      # 배포된 웹 빌드를 크롬의 휴대폰 에뮬레이션(844x390, 터치)으로 열어 공개 서버의 판에 들어가 본다
+      # (주소의 ?connect=로 바로 접속한다. 바로 앞 단계가 서버를 깨워 둔다).
       - uses: actions/setup-node@v4
         if: github.event_name == 'workflow_dispatch'
         with:
@@ -210,8 +211,8 @@ jobs:
         run: |
           mkdir -p build/live
           base="https://${GITHUB_REPOSITORY%/*}.github.io/${GITHUB_REPOSITORY#*/}/"
-          TAPS="252,129,70000" timeout 400 node tests/web/phone_check.mjs "$base" build/live/phone mobile \
-            2>&1 | tee live.log
+          MENU_WAIT=75000 GESTURES="shot,game" timeout 400 node tests/web/phone_check.mjs \
+            "$base?connect=wss://fps1-server.onrender.com" build/live/phone mobile 2>&1 | tee live.log
           grep -q "map: " live.log
           ! grep -qE "EXCEPTION|asset pack .* is missing" live.log
 
