@@ -44,7 +44,7 @@ func _physics_process(_delta: float) -> void:
 				menu.get("bot_count").set("value", 3)
 				menu.get("play_button").emit_signal("pressed")
 		30:
-			_expect(_game.call("is_started"), "PLAY VS BOTS did not start the match")
+			_expect(_game.call("is_started"), "START MATCH did not start the match")
 			_expect(_game.call("menu") == null, "main menu is still open after starting")
 			_expect(_game.call("local_player") != null, "no local player after starting")
 			if _game.call("local_player") != null:

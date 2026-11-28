@@ -284,3 +284,12 @@ func test_announcer_reports_zone_changes_but_not_resets() -> String:
 	if not flagged:
 		return "seeing zones should switch the start line to domination"
 	return ""
+
+
+func test_hud_score_limit_matches_the_session() -> String:
+	var session: GDScript = load("res://game/net/game_session.gd")
+	var limit: int = session.get_script_constant_map().get("SCORE_LIMIT", -1)
+	if MatchView.TDM_SCORE_LIMIT != limit:
+		return "HUD shows first to %d but the session ends at %d" % [
+			MatchView.TDM_SCORE_LIMIT, limit]
+	return ""

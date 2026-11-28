@@ -3,9 +3,9 @@
 // 의존성 없이 Node 22의 내장 fetch/WebSocket으로 크롬 디버깅 프로토콜을 직접 쓴다.
 //
 //   (웹 빌드 폴더에서) python3 -m http.server 8123
-//   TAPS="418,95,45000" node tests/web/phone_check.mjs http://127.0.0.1:8123/ /tmp/web mobile
+//   TAPS="510,345,60000" node tests/web/phone_check.mjs http://127.0.0.1:8123/ /tmp/web mobile
 //
-// TAPS는 "x,y,대기ms;..." 형식의 터치 목록. 위 예는 PLAY VS BOTS를 누르고 45초 기다린다.
+// TAPS는 "x,y,대기ms;..." 형식의 터치 목록. 위 예는 PLAY 화면의 START MATCH를 누르고 60초 기다린다.
 // GESTURES로 누르고 있기·끌기·중간 화면 찍기를 이어서 할 수 있다(아래 코드의 주석 참고).
 // 결과: <outPrefix>_menu.png, <outPrefix>_game.png 와 브라우저 콘솔 로그.
 // GPU가 없는 환경에서는 소프트웨어 렌더링이라 매우 느리다(게임 화면까지 1분 안팎).

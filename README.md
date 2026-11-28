@@ -27,7 +27,7 @@ Windows와 웹에서 서비스하는 6v6 멀티플레이 1인칭 슈터입니다
 | 로드아웃 | 시작 화면이나 일시 정지 화면의 LOADOUT에서 주무기(소총, 기관단총, 산탄총, 저격총)를 고른다. 권총은 늘 함께 든다. 리스폰 직후 6초 안에 쏘기 전이면 바로, 아니면 다음 리스폰 때 바뀐다 |
 | 성장 | 킬 100, 헤드샷 +50, 판 승리 500(무승부 300, 패배 200) 경험치. 레벨에 따라 주무기가 풀린다: 기관단총 2, 산탄총 3, 저격총 4. 기기마다 따로 저장된다 |
 | 이름 | 시작 화면 제목 옆 CALLSIGN 칸. 영문, 숫자, 공백, `_-.`만 16자까지. 온라인에서는 서버가 겹치지 않게 뒤에 숫자를 붙인다. 아군 머리 위에 이름이 보인다 |
-| 점수판 | Tab을 누르는 동안(터치는 왼쪽 위 TAB 버튼), 죽었을 때, 판이 끝났을 때. 봇은 이름 뒤에 [B] |
+| 점수판 | Tab을 누르는 동안(터치는 오른쪽 위 표 아이콘), 죽었을 때, 판이 끝났을 때. 봇은 이름 옆에 BOT |
 
 | 맵 | 분위기 | 특징 |
 | --- | --- | --- |
@@ -78,7 +78,7 @@ godot -- --connect=127.0.0.1:7777
 - 화면 왼쪽: 누른 자리에 가상 스틱이 생깁니다. 끝까지 앞으로 밀면 달립니다.
 - 화면 오른쪽: 끌어서 시선을 돌립니다. FIRE 버튼을 누른 채 끌어도 됩니다.
 - 조준 보조: 조준선이 보이는 적 근처에 가면 시선 이동이 느려지고 적 쪽으로 살짝 끌립니다.
-- 버튼: FIRE 발사, AIM 정조준(누를 때마다 전환), JUMP 점프와 난간 넘기, DUCK 앉기(달리는 중엔 슬라이딩), R 재장전, GUN 주무기/권총 교체, NADE 수류탄, FLASH 섬광탄, MELEE 근접 공격, 왼쪽 위 II 일시 정지
+- 버튼(아이콘): 총알 발사, 조준점 정조준(누를 때마다 전환), 위 화살표 점프와 난간 넘기, 아래 화살표 앉기(달리는 중엔 슬라이딩), 원형 화살표 재장전, 좌우 화살표 주무기/권총 교체, 폭탄 수류탄, 번개 섬광탄(숫자는 남은 개수), 주먹 근접 공격, 오른쪽 위 II 일시 정지와 표 아이콘 점수판
 
 ## 테스트
 
@@ -117,14 +117,14 @@ GODOT=godot tests/net/run_net_test.sh prediction
 
 `main`에 병합될 때마다 웹 빌드가 `gh-pages` 브랜치에 올라가 GitHub Pages로 서비스됩니다
 (저장소 Settings → Pages에서 Source를 "Deploy from a branch", 브랜치를 `gh-pages`로 지정).
-공개 게임 서버는 `wss://fps1-server.onrender.com`이고 메뉴의 PLAY ONLINE이 기본으로 이곳에 접속합니다.
+공개 게임 서버는 `wss://fps1-server.onrender.com`이고 메뉴의 ONLINE이 기본으로 이곳에 접속합니다.
 
 휴대폰이 새 빌드마다 다시 받는 양을 줄이려고 웹 빌드는 세 덩어리로 나뉩니다(`tools/web/build_site.sh`).
 
 | 덩어리 | 크기(전송) | 다시 받는 때 |
 | --- | --- | --- |
 | 엔진 `engine/<해시>/index.wasm` | 약 10 MB(gzip) | Godot 버전을 바꿀 때 |
-| 에셋 팩 `assets/<해시>.pck`: game/·maps/의 텍스처, 모델, 소리 | 약 26 MB | 에셋이나 가져오기 설정이 바뀔 때 |
+| 에셋 팩 `assets/<해시>.pck`: game/·maps/의 텍스처, 모델, 소리, 글꼴 | 약 26 MB | 에셋이나 가져오기 설정이 바뀔 때 |
 | 본 팩 `v/<커밋>/index.pck`: 코드와 장면 | 약 0.3 MB | 빌드마다 |
 
 - 에셋 팩은 Web 프리셋에서 뺀 파일들을 `tools/web/make_asset_pack.gd`가 따로 묶은 것이고,
@@ -146,6 +146,7 @@ maps/                 맵 씬(depot, compound, outpost), maps/catalog.gd(맵 목
                       maps/textures(재질), maps/props(엄폐물 GLB)
 tests/                단위 테스트, smoke, 네트워크 테스트, shots(화면 캡처)
 tools/asset_pipeline/ 에셋 제작 스크립트 (Blender, 하늘)
+tools/ui/             UI 글꼴과 아이콘 글꼴 만들기
 tools/web/            웹 빌드를 엔진·에셋·본 팩으로 나눠 배치
 docs/                 기술 결정 기록, 에셋 품질 기준
 ```
@@ -163,6 +164,9 @@ docs/                 기술 결정 기록, 에셋 품질 기준
 | 하늘 | Poly Haven CC0 HDRI를 톤매핑한 파노라마(사진 속 해에 조명 방향을 맞춤) | `python3 tools/asset_pipeline/make_sky.py` (`maps/sky/README.md`) |
 | 바람 소리(Outpost) | numpy로 합성한 이음매 없는 20초 반복 | `python3 tools/audio/compose_wind.py game/audio/sfx/ambience_wind.ogg` |
 | 효과음 | ElevenLabs 효과음 생성 후 잘라서 음량 맞춤 | `game/audio/sfx/README.md` |
+| UI 글꼴 | Anton(제목), Roboto Condensed(본문, 가변 글꼴에서 폭 75로 고정) — SIL OFL | `python3 tools/ui/make_fonts.py ...` (`game/ui/fonts/README.md`) |
+| UI 아이콘 | Font Awesome Free Solid에서 쓰는 48개만 남긴 글꼴 — CC BY 4.0 | 같은 스크립트 |
+| 맵 사진(메뉴) | `views.tscn` 렌더를 480x270으로 줄임, 배경은 1280x720 | `game/ui/maps/` |
 
 AI로 만든 메시를 넣기 전에는 `tools/asset_pipeline/analyze.py`로 삼각형 수·UV·파일 크기를 재고,
 기준은 `docs/asset_quality.md`를 따릅니다. 각진 물체는 AI 메시 대신 스크립트로 모델링합니다.
@@ -171,6 +175,10 @@ AI로 만든 메시를 넣기 전에는 `tools/asset_pipeline/analyze.py`로 삼
 
 화면 확인: 창이 없는 환경에서도 `xvfb-run godot --rendering-driver opengl3 res://tests/shots/shots.tscn -- --out=build/shots`
 로 무기별 지향/정조준 화면을 PNG로 저장할 수 있습니다.
+
+UI 확인: `xvfb-run godot --rendering-driver opengl3 --resolution 1280x720 res://tests/shots/ui_shots.tscn -- --shot=menu --out=/tmp/ui`
+가 메뉴·온라인·설정·로드아웃을, `--shot=hud --bots=5 --mode=dom`이 경기 화면·점수판·일시 정지·결과를 찍습니다.
+`--phone`과 `--resolution 1688x780`을 주면 가로 휴대폰(터치 조작, UI 150%)처럼 찍습니다.
 
 맵 그래픽 비교: `xvfb-run godot --rendering-driver opengl3 res://tests/shots/views.tscn -- --map=depot --out=/tmp/views`가 맵마다 같은 자리 다섯 곳(마지막은 하늘 속 해를 향함)을 찍습니다.
 맵의 트인 정도: `godot --headless --fixed-fps 60 res://tests/shots/sightlines.tscn -- --map=outpost`가 양 진영 앞 공간에서 서로 보이는 자리 쌍의 비율을 출력합니다(Depot 0.43, Compound 0.15, Outpost 0.23).

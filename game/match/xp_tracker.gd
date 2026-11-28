@@ -25,6 +25,8 @@ func _init(hud: Node, keep: bool) -> void:
 	if hud != null:
 		_feed = XpFeed.new()
 		hud.add_child(_feed)
+		# 점수판과 결과 화면이 알림을 덮도록 맨 아래에 둔다.
+		hud.move_child(_feed, 0)
 
 
 func level() -> int:
@@ -66,9 +68,15 @@ func _add(amount: int, reason: String) -> void:
 		Settings.write(Progression.XP_KEY, xp)
 	if _feed == null:
 		return
-	_feed.show_award("+%d  %s" % [amount, reason])
+	# 판 결과 경험치는 결과 화면의 한 줄이 대신 알린다(가운데 결과 글씨와 겹치지 않게).
+	if not _match_over_award(reason):
+		_feed.show_award("+%d  %s" % [amount, reason])
 	for reached in range(before + 1, level() + 1):
 		var names: Array = Progression.unlocked_at(reached).map(
 			func(weapon_id: int) -> String: return Armory.title(weapon_id)
 		)
 		_feed.show_level_up(reached, names)
+
+
+static func _match_over_award(reason: String) -> bool:
+	return reason == "VICTORY" or reason == "MATCH"
