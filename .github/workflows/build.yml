@@ -178,6 +178,21 @@ jobs:
             --exit-after=110 2>&1 | tee public.log
           grep -E "NETSTATS|NETTEST|network:" public.log
 
+      # 휴대폰이 처음 받는 양: GitHub Pages가 각 파일을 압축해서 보내는지와 실제로 전송되는 바이트.
+      - name: Report web download size
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: |
+          base="https://${GITHUB_REPOSITORY%/*}.github.io/${GITHUB_REPOSITORY#*/}"
+          version=$(curl -s "$base/index.html" | grep -oE 'v/[0-9a-f]+' | head -1)
+          echo "live build: $version"
+          for f in index.wasm index.pck index.js; do
+            curl -s -o /dev/null -D "/tmp/$f.h" -H 'Accept-Encoding: gzip, deflate, br' \
+              -w "WEBSIZE $f http=%{http_code} sent=%{size_download} type=%{content_type}\n" \
+              "$base/$version/$f"
+            grep -i '^content-encoding' "/tmp/$f.h" || echo "WEBSIZE $f not compressed"
+          done
+
       - name: Export Windows
         run: |
           mkdir -p build/windows
