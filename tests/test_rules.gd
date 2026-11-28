@@ -170,8 +170,14 @@ func test_levels_follow_the_xp_curve() -> String:
 		previous_span = span
 		if Progression.level_for(Progression.level_start(level)) != level:
 			return "level_for disagrees with level_start at %d" % level
+	return ""
+
+
+func test_level_cap_and_progress_within_a_level() -> String:
 	if Progression.level_for(10000000) != Progression.MAX_LEVEL:
 		return "level is not capped"
+	if Progression.progress_in_level(10000000) != [0, 0]:
+		return "the top level should have no progress bar"
 	var progress := Progression.progress_in_level(Progression.level_start(3) + 50)
 	if progress != [50, 1200]:
 		return "progress in level 3 is %s" % [progress]
