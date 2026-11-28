@@ -45,6 +45,17 @@ static func write(key: String, value: Variant) -> void:
 	config.save(PATH)
 
 
+## 저장된 값을 지운다(없으면 아무것도 하지 않는다).
+static func forget(key: String) -> void:
+	var config := ConfigFile.new()
+	if config.load(PATH) != OK:
+		return
+	var parts := key.split("/")
+	if config.has_section_key(parts[0], parts[1]):
+		config.erase_section_key(parts[0], parts[1])
+		config.save(PATH)
+
+
 ## 휴대폰이나 태블릿의 브라우저/앱인지. 한 번 판단한 결과를 기억한다.
 static func is_mobile() -> bool:
 	if _mobile < 0:

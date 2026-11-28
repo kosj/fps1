@@ -167,7 +167,7 @@ func set_touch(enabled: bool) -> void:
 		return
 	touch = TouchControls.new()
 	hud.add_child(touch)
-	hud.use_touch_layout()
+	hud.use_touch_layout(touch)
 	touch.look.connect(_on_touch_look)
 	touch.pause_pressed.connect(set_paused.bind(true))
 
@@ -667,7 +667,7 @@ func _on_impact(point: Vector3, normal: Vector3) -> void:
 
 
 func _on_weapon_changed(data: Resource) -> void:
-	hud.set_weapon_name("%d  %s" % [weapon.slot + 1, data.get("display_name")])
+	hud.set_weapon(Armory.id_of(data), weapon.slot)
 	hud.set_reloading(false)
 	view_model.set_weapon(data)
 	view_model.play_reload(WeaponController.SWITCH_TIME)

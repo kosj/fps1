@@ -7,11 +7,14 @@ const RemoteAvatar := preload("res://game/player/remote_avatar.gd")
 const Protocol := preload("res://game/net/net_protocol.gd")
 const XpTracker := preload("res://game/match/xp_tracker.gd")
 const Announcer := preload("res://game/audio/announcer.gd")
+const Domination := preload("res://game/match/domination.gd")
+const UiStyle := preload("res://game/ui/ui_style.gd")
+## 팀 데스매치 목표 점수. game_session.gd의 SCORE_LIMIT와 같아야 한다(테스트가 확인한다).
+const TDM_SCORE_LIMIT := 30
 ## 판이 막 시작한 것으로 보는 남은 시간(초). 판 길이는 game_session.gd의 MATCH_TIME(300초).
 const FRESH_MATCH_TIME := 295.0
 ## 이 시간(초)이 남았을 때 "1분 남았다"고 알린다.
 const LAST_MINUTE := 60.0
-const TEAM_NAMES := ["BLUE", "RED"]
 const ALLY_COLOR := Color(0.25, 0.45, 0.9)
 const ENEMY_COLOR := Color(0.85, 0.25, 0.2)
 const NEUTRAL_COLOR := Color(0.75, 0.75, 0.75)
@@ -32,12 +35,21 @@ var _killed_by := ""
 var _was_over := false
 var _last_time := -1.0
 var _zone_owners: Array = []
+## 점령전인지(거점 상태를 한 번이라도 받았으면).
+var _domination := false
 
 
 func relative_color(team: int) -> Color:
 	if team < 0:
 		return NEUTRAL_COLOR
 	return ALLY_COLOR if team == own_team else ENEMY_COLOR
+
+
+## HUD 글자와 막대에 쓰는 팀 색(어두운 배경에서 잘 읽히는 밝은 색).
+func hud_color(team: int) -> Color:
+	if team < 0:
+		return UiStyle.NEUTRAL
+	return UiStyle.ALLY if team == own_team else UiStyle.ENEMY
 
 
 ## 킬 알림에 쓰는 이름. 나는 YOU, 모르는 사람은 번호.
@@ -101,6 +113,7 @@ func clear_zones() -> void:
 func show_zones(parent: Node, hud, zones: Array, states: Array) -> void:
 	if states.is_empty():
 		return
+	_domination = true
 	if announcer != null:
 		_announce_zones(states)
 	while _markers.size() < zones.size():
@@ -113,13 +126,13 @@ func show_zones(parent: Node, hud, zones: Array, states: Array) -> void:
 	for index in states.size():
 		var row: Array = states[index]
 		var color := relative_color(int(row[0]))
-		var text := str(zones[index][0])
 		if float(row[1]) > 0.0:
-			text += " %d%%" % int(float(row[1]) * 100.0)
 			_markers[index].set_state(relative_color(int(row[2])), float(row[1]))
 		else:
 			_markers[index].set_state(color, 0.0)
-		items.append([text, color])
+		var owner := int(row[0])
+		items.append([str(zones[index][0]), hud_color(owner), owner >= 0,
+			hud_color(int(row[2])), float(row[1])])
 	if hud != null:
 		hud.set_zones(items)
 
@@ -133,10 +146,12 @@ func show_kill(
 		_killed_by = "" if killer == own_id else name_of(killer, own_id)
 	if hud == null:
 		return
-	var text := "%s  >  %s" % [name_of(killer, own_id), name_of(victim, own_id)]
-	if headshot:
-		text += "  (HS)"
-	hud.add_feed_line(text, relative_color(killer_team))
+	# 아군 사격이 없으니 죽은 쪽은 상대 팀이다(자폭은 같은 팀).
+	var victim_team := killer_team if killer == victim else 1 - killer_team
+	hud.add_kill(
+		name_of(killer, own_id), hud_color(killer_team), name_of(victim, own_id),
+		hud_color(victim_team), headshot, killer == own_id or victim == own_id
+	)
 
 
 ## 점수판과 가운데 안내 문구. status는 [팀, 0팀 점수, 1팀 점수, 남은 시간, 종료 여부, 킬, 데스, 생존].
@@ -156,48 +171,20 @@ func show_match(hud, status: Array) -> void:
 	if hud == null:
 		return
 	var seconds := int(ceilf(float(status[3])))
-	var clock := "%d:%02d" % [seconds / 60, seconds % 60]
-	if hud.is_narrow():
-		# 세로로 든 휴대폰: 일시 정지 버튼과 탄약 표시 사이에 들어가도록 내 팀 점수를 앞에 두고 짧게 쓴다.
-		var mine := score_a if team == 0 else score_b
-		var theirs := score_b if team == 0 else score_a
-		hud.set_score("%d - %d   %s" % [mine, theirs, clock])
-	else:
-		hud.set_score(
-			"%s %d  -  %d %s    %s    K %d  D %d  [%s]"
-			% [
-				TEAM_NAMES[0], score_a, score_b, TEAM_NAMES[1], clock,
-				int(status[5]), int(status[6]), TEAM_NAMES[team],
-			]
-		)
-	var message := ""
+	var limit := Domination.SCORE_LIMIT if _domination else TDM_SCORE_LIMIT
+	var title := "DOMINATION" if _domination else "TEAM DEATHMATCH"
+	hud.set_match_score(own, other, seconds, limit, "%s  ·  FIRST TO %d" % [title, limit])
 	if bool(status[4]):
-		var title := "DRAW"
-		var color := Color(0.9, 0.9, 0.9)
-		if own > other:
-			title = "VICTORY"
-			color = Color(0.45, 0.75, 1.0)
-		elif own < other:
-			title = "DEFEAT"
-			color = Color(1.0, 0.4, 0.35)
-		# 개인 킬/데스는 아래 점수판에 나온다.
-		var detail := "%s %d  -  %d %s    Next match starting soon" % [
-			TEAM_NAMES[0], score_a, score_b, TEAM_NAMES[1],
-		]
-		if xp != null:
-			detail += "\n" + xp.summary()
-		hud.set_result(title, color, detail)
+		var outcome := "draw"
+		if own != other:
+			outcome = "victory" if own > other else "defeat"
+		hud.set_result(outcome, own, other, xp.summary() if xp != null else "")
 	else:
-		hud.set_result("", Color.WHITE, "")
-		if not bool(status[7]):
-			message = "RESPAWNING"
-			if _killed_by != "":
-				message = "KILLED BY %s     RESPAWNING" % _killed_by
-	hud.set_message(message)
+		hud.set_result("", 0, 0, "")
+	hud.set_death(not bool(status[4]) and not bool(status[7]), _killed_by)
 
 
 ## 점수판. rows는 [id, 팀, 킬, 데스, 봇 여부, 이름]. 죽었거나 판이 끝났을 때(force), 또는 Tab을 누르는 동안 보인다.
-## 봇은 이름 뒤에 [B]를 붙인다.
 func show_scores(hud: Node, rows: Array, own_id: int, force: bool) -> void:
 	learn_names(rows)
 	var shown := force or Input.is_action_pressed("scoreboard")
@@ -206,9 +193,8 @@ func show_scores(hud: Node, rows: Array, own_id: int, force: bool) -> void:
 		for row: Array in rows:
 			var id := int(row[0])
 			var player_name := str(names.get(id, name_of(id, -1)))
-			if bool(row[4]):
-				player_name += " [B]"
-			lines.append([int(row[1]), player_name, int(row[2]), int(row[3]), id == own_id])
+			lines.append([int(row[1]), player_name, int(row[2]), int(row[3]), id == own_id,
+				bool(row[4])])
 	hud.set_scoreboard(shown, lines, own_team)
 
 

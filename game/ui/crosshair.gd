@@ -41,10 +41,16 @@ func _draw() -> void:
 	if alpha > 0.01:
 		# 퍼짐 각도를 화면 픽셀로 근사한다.
 		var gap := 4.0 + spread_deg * size.y / maxf(fov, 1.0)
-		var color := Color(1.0, 1.0, 1.0, 0.9 * alpha)
-		for direction: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
-			var start := center + direction * gap
-			draw_line(start, start + direction * LINE_LENGTH, color, LINE_WIDTH)
+		var color := Color(1.0, 1.0, 1.0, 0.92 * alpha)
+		var shade := Color(0.0, 0.0, 0.0, 0.45 * alpha)
+		# 밝은 하늘과 눈밭에서도 보이도록 어두운 테두리를 먼저 그린다.
+		for pass_color: Color in [shade, color]:
+			var width := LINE_WIDTH + (2.0 if pass_color == shade else 0.0)
+			for direction: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+				var start := center + direction * gap
+				var pad := direction * (1.0 if pass_color == shade else 0.0)
+				draw_line(start - pad, start + direction * LINE_LENGTH + pad, pass_color, width)
+		draw_circle(center, 2.5, shade)
 		draw_circle(center, 1.5, color)
 	if scope_blend > 0.01:
 		_draw_scope(center)
@@ -55,9 +61,11 @@ func _draw() -> void:
 	if _hit_left > 0.0:
 		var hit_alpha := _hit_left / HIT_TIME
 		var color := Color(_hit_color.r, _hit_color.g, _hit_color.b, hit_alpha)
+		var shade := Color(0.0, 0.0, 0.0, 0.5 * hit_alpha)
 		for direction: Vector2 in [Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]:
 			var unit := direction.normalized()
-			draw_line(center + unit * 7.0, center + unit * 15.0, color, LINE_WIDTH)
+			draw_line(center + unit * 6.0, center + unit * 16.0, shade, LINE_WIDTH + 2.5)
+			draw_line(center + unit * 7.0, center + unit * 15.0, color, LINE_WIDTH + 0.5)
 
 
 func _draw_scope(center: Vector2) -> void:

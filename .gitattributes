@@ -25,3 +25,7 @@ game/player/models/*.jpg -filter -diff -merge -text
 game/weapons/models/*.jpg -filter -diff -merge -text
 # 무기 아이콘(각 수십 KB)도 LFS 없이 둔다.
 game/ui/icons/*.png -filter -diff -merge -text
+# 메뉴의 맵 사진(각 수십 KB).
+game/ui/maps/*.jpg -filter -diff -merge -text
+# UI 글꼴(각 수십 KB, 쓰는 글자만 남김).
+*.ttf binary

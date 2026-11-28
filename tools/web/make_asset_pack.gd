@@ -11,7 +11,7 @@ extends SceneTree
 ## game/core/asset_pack.gd가 팩을 끼운 직후 등록한다(그래야 "invalid UID" 경고 없이 바로 찾는다).
 
 const ROOTS := ["res://game", "res://maps"]
-const EXTENSIONS := ["jpg", "png", "glb", "ogg", "wav"]
+const EXTENSIONS := ["jpg", "png", "glb", "ogg", "wav", "ttf"]
 const UIDS := "res://.godot/asset_uids.txt"
 
 
