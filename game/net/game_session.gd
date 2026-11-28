@@ -38,6 +38,9 @@ const LaunchArgs := preload("res://game/core/launch_args.gd")
 const Catalog := preload("res://maps/catalog.gd")
 const Grenades := preload("res://game/combat/grenades.gd")
 const Armory := preload("res://game/weapons/armory.gd")
+const Prediction := preload("res://game/net/prediction.gd")
+const XpTracker := preload("res://game/match/xp_tracker.gd")
+const Progression := preload("res://game/core/progression.gd")
 const ScriptBot := preload("res://game/bots/script_bot.gd")
 const CombatBot := preload("res://game/bots/combat_bot.gd")
 const Domination := preload("res://game/match/domination.gd")
@@ -227,6 +230,7 @@ func _start_from_args() -> void:
 		mode = Mode.LOCAL_MATCH
 		if not _args.has("spectate"):
 			_local = _add_participant(LOCAL_ID, "local")["player"]
+			_start_xp()
 		_add_bots(int(_args.get("bots", "5")))
 
 
@@ -247,6 +251,7 @@ func _on_start_requested(kind: String, options: Dictionary) -> void:
 			_set_game_mode(str(options.get("mode", "tdm")))
 			_local = _add_participant(LOCAL_ID, "local")["player"]
 			Authority.choose_primary(_peers[LOCAL_ID], _saved_primary())
+			_start_xp()
 			_add_bots(int(options.get("bots", 5)))
 	_apply_quality()
 	_add_pause_menu()
@@ -780,6 +785,7 @@ func _on_connected() -> void:
 	_local = _spawn_player(true, 0)
 	_local.weapon.resolve_shot = _client_resolve_shot
 	_rpc_loadout.rpc_id(1, _saved_primary())
+	_start_xp()
 	print("connected as peer %d" % multiplayer.get_unique_id())
 
 
@@ -874,9 +880,19 @@ func choose_primary(id: int) -> bool:
 
 
 ## 고른 주무기. 테스트용 스크립트 봇(--bot)은 저장된 설정과 상관없이 --primary(없으면 기본)를 쓴다.
+## 사람은 레벨이 모자라 잠긴 총을 고를 수 없다.
 func _saved_primary() -> int:
-	var saved = Armory.DEFAULT_PRIMARY if _bot != null else Settings.read(Settings.PRIMARY, 0)
-	return int(_args.get("primary", saved))
+	if _bot != null:
+		return int(_args.get("primary", Armory.DEFAULT_PRIMARY))
+	var saved := int(Settings.read(Settings.PRIMARY, Armory.DEFAULT_PRIMARY))
+	return Progression.allowed_primary(saved, Armory.DEFAULT_PRIMARY)
+
+
+## 경험치(연습장 제외). 테스트용 스크립트 봇과 화면 없는 실행은 세기만 하고 저장하지 않는다.
+func _start_xp() -> void:
+	if _local != null:
+		var keep := _bot == null and DisplayServer.get_name() != "headless"
+		_view.xp = XpTracker.new(_local.hud, keep)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -936,33 +952,7 @@ func _apply_snapshot(
 	_view.show_scores(_local.hud, _score_rows, multiplayer.get_unique_id(), show_scores)
 	if not (status[11] as Array).is_empty():
 		_view.show_zones(self, _local.hud, _map.call("capture_zones"), status[11])
-	_reconcile(last_seq, own, delta)
-
-
-## 서버가 last_seq까지 적용한 결과(own)를 그 시점의 내 예측과 비교한다.
-## 다르면 서버 상태로 되돌리고, 그 뒤에 보낸 입력을 다시 돌려 현재 상태를 새로 계산한다.
-func _reconcile(last_seq: int, own: Array, delta: float) -> void:
-	while not _pending.is_empty() and int(_pending[0][0]) < last_seq:
-		_pending.pop_front()
-	if _pending.is_empty() or int(_pending[0][0]) != last_seq:
-		# 비교할 예측이 없으면(접속 직후) 서버 상태를 그대로 따른다.
-		if last_seq == 0:
-			_local.restore_state(own)
-		return
-	var predicted: Array = _pending[0][2]
-	var predicted_position: Vector3 = predicted[0]
-	var server_position: Vector3 = own[0]
-	var error := predicted_position.distance_to(server_position)
-	stats["max_error"] = maxf(stats["max_error"], error)
-	if error <= Protocol.RECONCILE_TOLERANCE and int(predicted[2]) == int(own[2]):
-		return
-	stats["corrections"] += 1
-	var before: Vector3 = _local.global_position
-	_local.restore_state(own)
-	for index in range(1, _pending.size()):
-		_local.simulate(_pending[index][1], delta, true)
-		_pending[index][2] = _local.capture_state()
-	_local.add_visual_offset(before - _local.global_position)
+	Prediction.reconcile(_local, _pending, last_seq, own, delta, stats)
 
 
 # ---------------------------------------------------------------- 종료와 검증
@@ -973,6 +963,8 @@ func _finish() -> void:
 	_exit_after = 0.0
 	if _local != null:
 		stats["primary"] = _local.primary
+	if _view.xp != null:
+		stats["xp"] = _view.xp.earned
 	if _remote_max_x > _remote_min_x:
 		stats["remote_travel"] = _remote_max_x - _remote_min_x
 	var role := "local"

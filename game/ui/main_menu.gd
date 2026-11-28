@@ -9,6 +9,7 @@ const Settings := preload("res://game/core/settings.gd")
 const Catalog := preload("res://maps/catalog.gd")
 const Armory := preload("res://game/weapons/armory.gd")
 const LoadoutPanel := preload("res://game/ui/loadout_panel.gd")
+const Progression := preload("res://game/core/progression.gd")
 ## 공용 서버(Render 무료 요금제). 예전 기본값(내 PC)이 저장돼 있으면 이 주소로 바꿔 보여 준다.
 const DEFAULT_ADDRESS := "wss://fps1-server.onrender.com"
 const OLD_DEFAULT_ADDRESS := "127.0.0.1:7777"
@@ -44,7 +45,12 @@ func _ready() -> void:
 	layer = 20
 	_build_backdrop()
 	var column := MenuKit.centered_column(self, Color(0.04, 0.05, 0.07, 0.68))
-	column.add_child(MenuKit.label("FPS1", 48))
+	var title_row := HBoxContainer.new()
+	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	title_row.add_theme_constant_override("separation", 28)
+	title_row.add_child(MenuKit.label("FPS1", 48))
+	title_row.add_child(_level_badge())
+	column.add_child(title_row)
 	if notice != "":
 		var notice_label := MenuKit.label(notice, 20)
 		notice_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.45))
@@ -154,7 +160,38 @@ func open_loadout() -> LoadoutPanel:
 
 
 func _saved_primary() -> int:
-	return Armory.valid_primary(int(Settings.read(Settings.PRIMARY, Armory.DEFAULT_PRIMARY)))
+	var saved := Armory.valid_primary(int(Settings.read(Settings.PRIMARY, Armory.DEFAULT_PRIMARY)))
+	return Progression.allowed_primary(saved, Armory.DEFAULT_PRIMARY)
+
+
+## 제목 옆의 레벨 표시: 레벨, 다음 레벨까지의 막대, 경험치.
+func _level_badge() -> Control:
+	var xp := Progression.saved_xp()
+	var progress := Progression.progress_in_level(xp)
+	var badge := VBoxContainer.new()
+	badge.alignment = BoxContainer.ALIGNMENT_CENTER
+	badge.add_theme_constant_override("separation", 3)
+	var level_label := MenuKit.label("LEVEL %d" % Progression.level_for(xp), 20)
+	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	badge.add_child(level_label)
+	var bar := ProgressBar.new()
+	bar.custom_minimum_size = Vector2(170.0, 6.0)
+	bar.show_percentage = false
+	bar.max_value = maxf(float(progress[1]), 1.0)
+	bar.value = float(progress[0]) if int(progress[1]) > 0 else bar.max_value
+	var back := StyleBoxFlat.new()
+	back.bg_color = Color(1.0, 1.0, 1.0, 0.15)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.55, 0.85, 1.0)
+	bar.add_theme_stylebox_override("background", back)
+	bar.add_theme_stylebox_override("fill", fill)
+	badge.add_child(bar)
+	var text := "MAX" if int(progress[1]) == 0 else "%d / %d XP" % [progress[0], progress[1]]
+	var xp_label := MenuKit.label(text, 13)
+	xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	xp_label.add_theme_color_override("font_color", Color(0.72, 0.75, 0.8))
+	badge.add_child(xp_label)
+	return badge
 
 
 func _show_loadout() -> void:

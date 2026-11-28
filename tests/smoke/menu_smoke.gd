@@ -4,16 +4,20 @@ extends Node
 
 const MAIN_SCENE := preload("res://game/main.tscn")
 const Settings := preload("res://game/core/settings.gd")
+const Progression := preload("res://game/core/progression.gd")
 
 var _game: Node
 var _tick := 0
 var _failures := PackedStringArray()
 ## 테스트가 바꾼 설정을 끝날 때 되돌린다(같은 기기의 다른 테스트와 실제 플레이에 남지 않게).
 var _saved_primary: Variant
+var _saved_xp: Variant
 
 
 func _ready() -> void:
 	_saved_primary = Settings.read(Settings.PRIMARY, 0)
+	_saved_xp = Settings.read(Progression.XP_KEY, 0)
+	Settings.write(Progression.XP_KEY, 0)
 	_game = MAIN_SCENE.instantiate()
 	add_child(_game)
 
@@ -26,9 +30,16 @@ func _physics_process(_delta: float) -> void:
 			_expect(menu != null, "no main menu without command line arguments")
 			_expect(not _game.call("is_started"), "match started before a menu choice")
 			if menu != null:
-				# 로드아웃 화면에서 저격총을 고르고 경기를 시작한다.
+				# 레벨 1에서는 저격총이 잠겨 있어 고를 수 없다.
+				var locked: Node = menu.call("open_loadout")
+				_expect(locked.get("back_button") != null, "the loadout screen has no BACK button")
+				locked.call("pick", 3)
+				_expect(locked.get("selected") != 3, "a locked weapon was chosen at level 1")
+				locked.call("_close")
+				# 저격총이 풀리는 레벨이 되면 고르고 경기를 시작한다.
+				var needed := Progression.level_start(Progression.unlock_level(3))
+				Settings.write(Progression.XP_KEY, needed)
 				var panel: Node = menu.call("open_loadout")
-				_expect(panel.get("back_button") != null, "the loadout screen has no BACK button")
 				panel.call("pick", 3)
 				menu.get("bot_count").set("value", 3)
 				menu.get("play_button").emit_signal("pressed")
@@ -55,6 +66,7 @@ func _physics_process(_delta: float) -> void:
 			for failure in _failures:
 				printerr("MENU SMOKE FAIL ", failure)
 			Settings.write(Settings.PRIMARY, _saved_primary)
+			Settings.write(Progression.XP_KEY, _saved_xp)
 			print("menu smoke: %d failures" % _failures.size())
 			get_tree().quit(1 if _failures.size() > 0 else 0)
 
